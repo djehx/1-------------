@@ -62,6 +62,33 @@ h1.is-glitching {
   animation: text-noise 80ms steps(2, end) infinite;
 }
 
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.site-nav a {
+  padding: 8px 12px;
+  border: 1px solid #425347;
+  border-radius: 3px;
+  color: #c2cec6;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  border-color: #a9c8b6;
+  color: #edf3ee;
+}
+
+.site-nav a:focus-visible {
+  outline: 2px solid #f1c76b;
+  outline-offset: 3px;
+}
+
 @keyframes text-noise {
   0% {
     text-shadow: 2px 0 #ff5470, -2px 0 #54d9ff;
