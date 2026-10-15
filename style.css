@@ -252,6 +252,72 @@ h1.is-glitching {
   touch-action: manipulation;
 }
 
+#game {
+  display: block;
+  width: 100%;
+  height: clamp(210px, 30vw, 280px);
+  object-fit: cover;
+  transition: transform 240ms ease;
+}
+
+.survivor-portal {
+  position: relative;
+  display: block;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid #425347;
+  background: #14231c;
+  color: #f2f0e6;
+  text-decoration: none;
+}
+
+.survivor-portal::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(12 20 16 / 90%), rgb(12 20 16 / 48%) 52%, transparent), linear-gradient(0deg, rgb(12 20 16 / 50%), transparent 55%);
+  content: "";
+}
+
+.survivor-portal:hover #game {
+  transform: scale(1.025);
+}
+
+.survivor-portal:focus-visible {
+  outline: 2px solid #f1c76b;
+  outline-offset: 4px;
+}
+
+.survivor-portal__copy {
+  position: absolute;
+  z-index: 1;
+  inset: auto 28px 24px;
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+}
+
+.survivor-portal__eyebrow {
+  color: #d8b96e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.survivor-portal__copy strong {
+  color: #f2f0e6;
+  font-size: clamp(24px, 5vw, 34px);
+  line-height: 1.2;
+}
+
+.survivor-portal__action {
+  color: #d4ddd3;
+  font-size: 14px;
+}
+
+.survivor-portal__action span {
+  padding-left: 5px;
+  color: #e7c47e;
+}
+
 .tower-defense__overlay {
   position: absolute;
   inset: 0;

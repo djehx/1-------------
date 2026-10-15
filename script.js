@@ -509,6 +509,7 @@ function drawBoard() {
 		boardContext.stroke();
 		boardContext.globalAlpha = 1;
 	});
+
 }
 
 function gameLoop(timestamp) {
@@ -541,3 +542,86 @@ startButton.addEventListener("click", beginStage);
 restartButton.addEventListener("click", restartGame);
 updateGameLabels();
 drawBoard();
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const sky = ctx.createLinearGradient(0, 0, 0, 600);
+sky.addColorStop(0, "#18221e");
+sky.addColorStop(0.58, "#34453b");
+sky.addColorStop(1, "#121a16");
+ctx.fillStyle = sky;
+ctx.fillRect(0, 0, 800, 600);
+
+ctx.fillStyle = "#202b25";
+ctx.beginPath();
+ctx.moveTo(0, 185);
+ctx.quadraticCurveTo(400, 68, 800, 185);
+ctx.lineTo(800, 305);
+ctx.quadraticCurveTo(400, 218, 0, 305);
+ctx.closePath();
+ctx.fill();
+ctx.strokeStyle = "#a58d56";
+ctx.lineWidth = 4;
+ctx.beginPath();
+ctx.moveTo(0, 185);
+ctx.quadraticCurveTo(400, 68, 800, 185);
+ctx.stroke();
+
+function drawColumn(x, y, width, height) {
+	ctx.fillStyle = "#8c8066";
+	ctx.beginPath();
+	ctx.moveTo(x - width * 0.42, y);
+	ctx.lineTo(x + width * 0.42, y);
+	ctx.lineTo(x + width * 0.32, y - height);
+	ctx.lineTo(x - width * 0.32, y - height);
+	ctx.closePath();
+	ctx.fill();
+	ctx.fillStyle = "#d0ad61";
+	ctx.fillRect(x - width * 0.48, y - height - 8, width * 0.96, 10);
+	ctx.fillStyle = "#596454";
+	ctx.fillRect(x - width * 0.56, y - 2, width * 1.12, 7);
+}
+
+[75, 185, 615, 735].forEach((x, index) => drawColumn(x, 305 - (index % 2) * 18, 34, 90 + (index % 3) * 12));
+
+const arena = ctx.createLinearGradient(0, 282, 0, 600);
+arena.addColorStop(0, "#66705c");
+arena.addColorStop(1, "#202e27");
+ctx.fillStyle = arena;
+ctx.beginPath();
+ctx.ellipse(410, 440, 510, 190, 0, 0, Math.PI * 2);
+ctx.fill();
+ctx.strokeStyle = "#b89a5c";
+ctx.lineWidth = 3;
+for (const radius of [92, 164, 242, 328]) {
+	ctx.beginPath();
+	ctx.ellipse(410, 432, radius, radius * 0.34, 0, 0, Math.PI * 2);
+	ctx.stroke();
+}
+ctx.strokeStyle = "rgba(20, 35, 27, 0.48)";
+ctx.lineWidth = 2;
+for (let index = 0; index < 10; index += 1) {
+	const angle = (index / 10) * Math.PI * 2;
+	ctx.beginPath();
+	ctx.moveTo(410, 430);
+	ctx.lineTo(410 + Math.cos(angle) * 380, 430 + Math.sin(angle) * 138);
+	ctx.stroke();
+}
+
+drawColumn(350, 420, 66, 118);
+drawColumn(592, 390, 44, 82);
+ctx.fillStyle = "#a94e3c";
+ctx.beginPath();
+ctx.arc(500, 348, 19, 0, Math.PI * 2);
+ctx.fill();
+ctx.fillRect(488, 363, 24, 33);
+ctx.beginPath();
+ctx.arc(556, 371, 15, 0, Math.PI * 2);
+ctx.fillStyle = "#8a9c91";
+ctx.fill();
+ctx.save();
+ctx.translate(545, 374);
+ctx.rotate(0.45);
+ctx.fillStyle = "#c9d5c9";
+ctx.fillRect(-4, -34, 8, 72);
+ctx.restore();
