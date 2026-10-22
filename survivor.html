@@ -376,8 +376,14 @@
     <div class="error-note" id="error-note" hidden><p>3D 장면을 불러오지 못했습니다. 인터넷 연결과 WebGL 지원을 확인한 뒤 페이지를 새로고침해 주세요.</p></div>
   </main>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.152.2/three.min.js"></script>
-  <script>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"}}
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { clone as cloneSkinnedModel } from "three/addons/utils/SkeletonUtils.js";
+
     (() => {
       "use strict";
 
@@ -386,12 +392,9 @@
       const panels = ["#intro-panel", "#shop-panel", "#pause-panel", "#end-panel"].map($);
       const mount = $("#game-mount");
       const errorNote = $("#error-note");
-
-      if (!window.THREE) {
-        errorNote.hidden = false;
-        screen.hidden = true;
-        return;
-      }
+      const startButton = $("#start-button");
+      startButton.disabled = true;
+      startButton.textContent = "드래곤 불러오는 중...";
 
       let renderer;
       try {
@@ -412,6 +415,21 @@
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1;
       mount.appendChild(renderer.domElement);
+
+      let dragonTemplate;
+      let dragonAnimations = [];
+      const dragonLoader = new GLTFLoader();
+      dragonLoader.load("assets/dragon_oga.gltf", (gltf) => {
+        dragonTemplate = gltf.scene;
+        dragonAnimations = gltf.animations;
+        startButton.disabled = false;
+        startButton.textContent = "아레나 입장";
+      }, undefined, (error) => {
+        console.error("노즐 GLTF 모델을 불러오지 못했습니다.", error);
+        $("#error-note p").textContent = "노즐 GLTF 모델을 불러오지 못했습니다. 로컬 웹 서버에서 페이지를 실행해 주세요.";
+        errorNote.hidden = false;
+        screen.hidden = true;
+      });
 
       const maxRenderWidth = 1982;
       const maxRenderHeight = 1080;
@@ -684,38 +702,91 @@
         return mesh;
       }
 
+      function createDragonTexture(size) {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        const gradient = context.createLinearGradient(0, 0, size, size);
+        gradient.addColorStop(0, "#75945a");
+        gradient.addColorStop(0.5, "#456c48");
+        gradient.addColorStop(1, "#294d3d");
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, size, size);
+
+        const step = Math.max(8, size / 18);
+        for (let row = 0; row < size / step; row += 1) {
+          for (let column = 0; column < size / step; column += 1) {
+            const x = column * step + (row % 2) * step * 0.5;
+            const y = row * step;
+            context.beginPath();
+            context.moveTo(x - step * 0.44, y);
+            context.quadraticCurveTo(x, y + step * 0.8, x + step * 0.44, y);
+            context.strokeStyle = (row + column) % 2 ? "#8eaa67" : "#31563f";
+            context.globalAlpha = 0.72;
+            context.lineWidth = Math.max(1, step * 0.09);
+            context.stroke();
+          }
+        }
+        context.globalAlpha = 1;
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        return texture;
+      }
+
+      const dragonTextureHigh = createDragonTexture(512);
+      const dragonTextureLow = createDragonTexture(64);
+      const dragonMaterials = {
+        high: new THREE.MeshStandardMaterial({ map: dragonTextureHigh, roughness: 0.76, side: THREE.DoubleSide }),
+        low: new THREE.MeshStandardMaterial({ map: dragonTextureLow, roughness: 0.76, side: THREE.DoubleSide }),
+      };
+
+      function setNozzleAnimation(enemy, animationName) {
+        const action = enemy.actions.get(animationName.toLowerCase());
+        if (!action || enemy.currentAction === action) return;
+        enemy.currentAction?.fadeOut(0.16);
+        action.reset().fadeIn(0.16).play();
+        enemy.currentAction = action;
+      }
+
       function makeNozzle(enemy) {
         const group = new THREE.Group();
-        const hide = new THREE.MeshStandardMaterial({ color: 0x53675c, roughness: 0.88 });
-        const flesh = new THREE.MeshStandardMaterial({ color: 0xb6624b, roughness: 0.68 });
-        const eye = new THREE.MeshStandardMaterial({ color: 0xf0d889, emissive: 0x61391b, emissiveIntensity: 1.4 });
-        addMesh(group, new THREE.SphereGeometry(0.68, 12, 10), hide, [0, 0.85, 0], [1.25, 0.72, 1.45]);
-        addMesh(group, new THREE.SphereGeometry(0.43, 12, 10), flesh, [0, 1.12, -0.78], [0.88, 0.85, 0.9]);
-        addMesh(group, new THREE.ConeGeometry(0.2, 0.62, 9), darkStone, [0, 1.05, -1.18], [1, 0.6, 1]);
-        addMesh(group, new THREE.SphereGeometry(0.09, 8, 8), eye, [-0.22, 1.23, -1.15]);
-        addMesh(group, new THREE.SphereGeometry(0.09, 8, 8), eye, [0.22, 1.23, -1.15]);
-        enemy.legs = [];
-        for (let index = 0; index < 4; index += 1) {
-          const side = index % 2 === 0 ? -1 : 1;
-          const front = index < 2 ? -1 : 1;
-          const leg = new THREE.Group();
-          leg.position.set(side * 0.55, 0.55, front * 0.55);
-          const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.13, 0.66, 7), hide);
-          upper.position.y = -0.26;
-          upper.rotation.z = side * 0.52;
-          leg.add(upper);
-          const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.56, 7), flesh);
-          lower.position.set(side * 0.18, -0.72, front * 0.12);
-          lower.rotation.z = -side * 0.18;
-          leg.add(lower);
-          group.add(leg);
-          enemy.legs.push(leg);
-        }
-        enemy.material = hide;
+        const model = cloneSkinnedModel(dragonTemplate);
+        model.traverse((object) => {
+          if (!object.isMesh) return;
+          object.material = dragonMaterials.high;
+          object.castShadow = true;
+          object.receiveShadow = true;
+          object.frustumCulled = false;
+        });
+        model.updateMatrixWorld(true);
+        const initialBounds = new THREE.Box3().setFromObject(model);
+        const initialSize = initialBounds.getSize(new THREE.Vector3());
+        model.scale.setScalar(2.15 / Math.max(initialSize.y, 0.001));
+        model.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(model);
+        const center = bounds.getCenter(new THREE.Vector3());
+        model.position.set(-center.x, -bounds.min.y, -center.z);
+        group.add(model);
+
+        enemy.model = model;
+        enemy.mixer = new THREE.AnimationMixer(model);
+        enemy.actions = new Map(dragonAnimations.map((clip) => [clip.name.toLowerCase(), enemy.mixer.clipAction(clip)]));
+        enemy.textureMeshes = [];
+        model.traverse((object) => {
+          if (object.isMesh) enemy.textureMeshes.push(object);
+        });
+        enemy.textureLod = "high";
+        enemy.lodTimer = 0;
+        enemy.attackAnimationTimer = 0;
         enemy.group = group;
         enemy.attackRange = 2.15;
         enemy.attackDamage = 9;
         enemy.speed = 2.7 + stage * 0.16;
+        setNozzleAnimation(enemy, "Idle");
       }
 
       function makeNosi(enemy) {
@@ -1174,17 +1245,30 @@
           enemy.group.rotation.y = Math.atan2(dirX, dirZ);
 
           if (enemy.type === "nozzle") {
-            if (distance > enemy.attackRange * 0.78) {
+            enemy.attackAnimationTimer = Math.max(0, enemy.attackAnimationTimer - delta);
+            enemy.lodTimer -= delta;
+            if (enemy.lodTimer <= 0) {
+              const lod = position.distanceTo(camera.position) <= 14 ? "high" : "low";
+              if (lod !== enemy.textureLod) {
+                enemy.textureMeshes.forEach((mesh) => { mesh.material = dragonMaterials[lod]; });
+                enemy.textureLod = lod;
+              }
+              enemy.lodTimer = 0.25;
+            }
+            const isMoving = distance > enemy.attackRange * 0.78;
+            if (isMoving) {
               const step = Math.min(enemy.speed * enemySpeedScale * delta, distance - enemy.attackRange * 0.72);
               position.x += dirX * step;
               position.z += dirZ * step;
             }
-            enemy.legs?.forEach((leg, index) => { leg.rotation.x = Math.sin(enemy.age * 9 + index * Math.PI) * 0.42; });
             enemy.attackCooldown -= delta;
             if (distance < enemy.attackRange && enemy.attackCooldown <= 0) {
+              enemy.attackAnimationTimer = 0.7;
               damagePlayer(enemy.attackDamage);
               enemy.attackCooldown = 1.1;
             }
+            setNozzleAnimation(enemy, enemy.attackAnimationTimer > 0 ? "Attack" : isMoving ? "Walk" : "Idle");
+            enemy.mixer.update(delta);
           } else {
             if (distance > 17) { position.x += dirX * enemy.speed * delta; position.z += dirZ * enemy.speed * delta; }
             if (distance < 10) { position.x -= dirX * enemy.speed * delta; position.z -= dirZ * enemy.speed * delta; }
