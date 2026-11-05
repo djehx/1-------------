@@ -135,8 +135,10 @@
     }
 
     .target-box.is-visible { opacity: 1; transform: translateX(-50%); }
+    .target-box.is-enraged { border-color: rgb(255 104 70 / 78%); box-shadow: 0 0 24px rgb(255 72 45 / 35%); }
     .target-heading { margin-bottom: 7px; }
     .target-heading strong { font-size: 13px; }
+    .target-box.is-enraged .target-heading strong { color: #ff9677; }
     .target-heading span { color: #f2c17a; font-size: 11px; font-variant-numeric: tabular-nums; }
     .target-box .meter { height: 5px; margin-top: 0; }
     .target-box .meter-fill { background: #df765c; }
@@ -505,6 +507,17 @@
         console.error("더미 필살기 폭발 VFX를 불러오지 못했습니다.", error);
       });
 
+      let clockLoopTemplate = null;
+      let clockLoopAnimations = [];
+      const clockLoopLoader = new GLTFLoader();
+      clockLoopLoader.load("assets/models/clock_loop_animation/scene.gltf", (gltf) => {
+        clockLoopTemplate = gltf.scene;
+        clockLoopAnimations = gltf.animations;
+        enemies.filter((enemy) => enemy.type === "boss").forEach(setupTimeStopClock);
+      }, undefined, (error) => {
+        console.error("보스 시간 정지 패턴 시계 모델을 불러오지 못했습니다.", error);
+      });
+
       let hurricaneVfxTemplate = null;
       let hurricaneVfxAnimations = [];
       const hurricaneVfxLoader = new GLTFLoader();
@@ -760,6 +773,7 @@
         dashSpeed: 19.5,
         dashDirection: new THREE.Vector3(),
         invulnerable: 0,
+        timeStopTimer: 0,
         weaponCooldown: 0,
         swingTime: 0,
         swingDuration: 0.3,
@@ -1113,9 +1127,60 @@
         enemy.attackCooldown = 2.8;
         enemy.ultimateCooldown = 8;
         enemy.chargeCooldown = 7;
+        enemy.timeStopCooldown = 12;
         enemy.bossState = "ground";
         enemy.bossStateTimer = 0;
+        enemy.timeStopPhase = null;
+        enemy.timeStopTimer = 0;
+        enemy.enraged = false;
         enemy.flightHeight = 17;
+        setupTimeStopClock(enemy);
+      }
+
+      function setupTimeStopClock(enemy) {
+        if (!clockLoopTemplate || clockLoopAnimations.length === 0 || !enemy.group || enemy.timeStopClock) return;
+        const frame = new THREE.Group();
+        frame.position.set(0, 5.5, -8);
+        frame.rotation.x = -Math.PI / 2;
+        const model = cloneSkinnedModel(clockLoopTemplate);
+        model.scale.setScalar(8);
+        model.traverse((object) => {
+          if (object.isMesh) {
+            object.frustumCulled = false;
+            object.castShadow = true;
+          }
+        });
+        frame.add(model);
+        enemy.group.add(frame);
+        enemy.timeStopClock = frame;
+        enemy.timeStopMixer = new THREE.AnimationMixer(model);
+        enemy.timeStopAction = enemy.timeStopMixer.clipAction(clockLoopAnimations[0]);
+        enemy.timeStopAction.setLoop(THREE.LoopOnce, 1);
+        enemy.timeStopAction.clampWhenFinished = true;
+        frame.visible = false;
+      }
+
+      function startTimeStopPattern(enemy) {
+        setupTimeStopClock(enemy);
+        if (!enemy.timeStopClock || !enemy.timeStopAction) {
+          console.error("보스 시간 정지 패턴을 시작할 수 없습니다. 시계 에셋이 준비되지 않았습니다.");
+          enemy.timeStopCooldown = 2;
+          return false;
+        }
+        enemy.timeStopClock.visible = true;
+        enemy.timeStopAction.reset().play();
+        enemy.timeStopPhase = "windup";
+        enemy.timeStopTimer = clockLoopAnimations[0].duration;
+        enemy.timeStopCooldown = enemy.enraged ? 15 : 24;
+        return true;
+      }
+
+      function removeTimeStopClock(enemy) {
+        enemy.timeStopAction?.stop();
+        enemy.timeStopClock?.removeFromParent();
+        enemy.timeStopClock = null;
+        enemy.timeStopMixer = null;
+        enemy.timeStopAction = null;
       }
 
       function createBossTelegraph(point, radius) {
@@ -1152,6 +1217,13 @@
         const effectIndex = explosionEffects.indexOf(warning);
         if (effectIndex >= 0) explosionEffects.splice(effectIndex, 1);
         enemy.warning = null;
+        enemy.additionalUltimateWarnings?.forEach((effect) => {
+          scene.remove(effect.group);
+          effect.mixer?.stopAllAction();
+          const index = explosionEffects.indexOf(effect);
+          if (index >= 0) explosionEffects.splice(index, 1);
+        });
+        enemy.additionalUltimateWarnings = [];
       }
 
       function warnBossAttack(enemy, stateName, point, radius, duration, damage) {
@@ -1178,11 +1250,28 @@
           player.position.z,
         );
         enemy.warning = createExplosionVfx(point);
-        enemy.warning.radius = 12;
-        enemy.warning.damage = 12;
+        enemy.warning.radius = enemy.enraged ? 13 : 12;
+        enemy.warning.damage = enemy.enraged ? 16 : 12;
         enemy.warning.damageStart = 5;
         enemy.warning.damageInterval = 0.65;
         enemy.warning.nextDamageAt = enemy.warning.damageStart;
+        enemy.additionalUltimateWarnings = [];
+        if (enemy.hp <= enemy.maxHp * 0.5) {
+          const towardPlayer = point.clone().sub(enemy.group.position).setY(0);
+          if (towardPlayer.lengthSq() === 0) towardPlayer.set(1, 0, 0);
+          towardPlayer.normalize();
+          const side = new THREE.Vector3(-towardPlayer.z, 0, towardPlayer.x);
+          const secondPoint = point.clone().addScaledVector(side, 20);
+          if (Math.hypot(secondPoint.x, secondPoint.z) > 31) secondPoint.setLength(31);
+          secondPoint.y = getStairHeight(secondPoint.x, secondPoint.z);
+          const secondWarning = createExplosionVfx(secondPoint);
+          secondWarning.radius = enemy.enraged ? 13 : 12;
+          secondWarning.damage = enemy.enraged ? 16 : 12;
+          secondWarning.damageStart = 5;
+          secondWarning.damageInterval = 0.65;
+          secondWarning.nextDamageAt = secondWarning.damageStart;
+          enemy.additionalUltimateWarnings.push(secondWarning);
+        }
         enemy.bossState = "ultimateRise";
         enemy.bossStateTimer = enemy.warning.duration;
         return true;
@@ -1190,9 +1279,9 @@
 
       function warnBossCharge(enemy, start, end) {
         const length = start.distanceTo(end);
-        const warning = createBossTelegraph(end, 2.8);
+        const warning = createBossTelegraph(end, enemy.enraged ? 3.2 : 2.8);
         const lane = new THREE.Mesh(
-          new THREE.BoxGeometry(3.2, 0.035, length),
+          new THREE.BoxGeometry(enemy.enraged ? 4 : 3.2, 0.035, length),
           new THREE.MeshBasicMaterial({ color: 0xff613d, transparent: true, opacity: 0.42, depthWrite: false }),
         );
         lane.position.set((start.x - end.x) / 2, 0.01, (start.z - end.z) / 2);
@@ -1202,9 +1291,9 @@
           ...warning,
           lane,
           point: end.clone(),
-          radius: 2.8,
-          damage: 42,
-          duration: 1.35,
+          radius: enemy.enraged ? 3.2 : 2.8,
+          damage: enemy.enraged ? 55 : 42,
+          duration: enemy.enraged ? 0.95 : 1.35,
         };
         enemy.bossState = "chargeWindup";
         enemy.bossStateTimer = enemy.warning.duration;
@@ -1360,15 +1449,18 @@
         player.velocityY = 0;
         player.jumpsLeft = 2;
         player.invulnerable = 0;
+        player.timeStopTimer = 0;
         player.dashCooldown = 0;
         player.dashTime = 0;
         player.weaponCooldown = 0;
         player.dashReady = true;
+        dom.targetBox.classList.remove("is-enraged");
         enemyHealthScale = enemySpeedScale = enemyDamageScale = 1;
         enemiesToSpawn = 0;
         enemies.splice(0).forEach((enemy) => {
           scene.remove(enemy.group);
           if (enemy.projectile) scene.remove(enemy.projectile);
+          removeTimeStopClock(enemy);
           removeBossTelegraph(enemy);
         });
         clearExplosionEffects();
@@ -1637,6 +1729,24 @@
         }
         updateEnemyProjectile(enemy, delta);
 
+        if (enemy.timeStopPhase === "windup") {
+          enemy.timeStopMixer?.update(delta);
+          enemy.timeStopTimer -= delta;
+          if (enemy.timeStopTimer <= 0) {
+            enemy.timeStopAction.paused = true;
+            player.timeStopTimer = 2;
+            enemy.timeStopPhase = "hold";
+            enemy.timeStopTimer = 2;
+          }
+        } else if (enemy.timeStopPhase === "hold") {
+          enemy.timeStopTimer -= delta;
+          if (enemy.timeStopTimer <= 0) {
+            removeTimeStopClock(enemy);
+            enemy.timeStopPhase = null;
+            enemy.timeStopCooldown = enemy.enraged ? 15 : 24;
+          }
+        }
+
         if (enemy.warning) {
           const pulse = 0.5 + Math.sin((enemy.bossStateTimer / Math.max(enemy.warning.duration, 0.01)) * Math.PI * 12) * 0.5;
           if (enemy.warning.lane) enemy.warning.lane.material.opacity = 0.22 + pulse * 0.42;
@@ -1649,6 +1759,9 @@
           enemy.group.position.y += (enemy.flightHeight - enemy.group.position.y) * Math.min(1, delta * 2.5);
           if (enemy.bossStateTimer <= 0) {
             damageBossAttack(enemy.warning.point, enemy.warning.radius, enemy.warning.damage, true);
+            enemy.additionalUltimateWarnings?.forEach((warning) => {
+              damageBossAttack(warning.point, warning.radius, warning.damage, true);
+            });
             removeBossTelegraph(enemy);
             enemy.bossState = "ultimateDescend";
             enemy.bossStateTimer = 1.8;
@@ -1662,7 +1775,7 @@
           if (enemy.bossStateTimer <= 0) {
             enemy.group.position.y = 0;
             enemy.bossState = "ground";
-            enemy.ultimateCooldown = 19;
+            enemy.ultimateCooldown = enemy.enraged ? 9 : 19;
             enemy.attackCooldown = 1.5;
           }
           return;
@@ -1672,7 +1785,8 @@
           enemy.bossStateTimer -= delta;
           if (enemy.bossStateTimer <= 0) {
             enemy.bossState = "charge";
-            enemy.bossStateTimer = 0.78;
+            enemy.chargeDuration = enemy.enraged ? 0.62 : 0.78;
+            enemy.bossStateTimer = enemy.chargeDuration;
             enemy.chargeHit = false;
           }
           return;
@@ -1680,21 +1794,21 @@
 
         if (enemy.bossState === "charge") {
           enemy.bossStateTimer -= delta;
-          const progress = THREE.MathUtils.clamp(1 - enemy.bossStateTimer / 0.78, 0, 1);
+          const progress = THREE.MathUtils.clamp(1 - enemy.bossStateTimer / enemy.chargeDuration, 0, 1);
           enemy.group.position.lerpVectors(enemy.chargeStart, enemy.chargeEnd, progress);
           const chargeX = enemy.chargeEnd.x - enemy.chargeStart.x;
           const chargeZ = enemy.chargeEnd.z - enemy.chargeStart.z;
           enemy.group.rotation.y = Math.atan2(chargeX, chargeZ);
           if (!enemy.chargeHit
-              && Math.hypot(player.position.x - enemy.group.position.x, player.position.z - enemy.group.position.z) < 2.8) {
-            damagePlayer(42);
+              && Math.hypot(player.position.x - enemy.group.position.x, player.position.z - enemy.group.position.z) < (enemy.enraged ? 3.2 : 2.8)) {
+            damagePlayer(enemy.enraged ? 55 : 42);
             enemy.chargeHit = true;
           }
           if (enemy.bossStateTimer <= 0) {
             removeBossTelegraph(enemy);
             enemy.bossState = "ground";
-            enemy.chargeCooldown = 10;
-            enemy.attackCooldown = 1.2;
+            enemy.chargeCooldown = enemy.enraged ? 5 : 10;
+            enemy.attackCooldown = enemy.enraged ? 0.6 : 1.2;
           }
           return;
         }
@@ -1706,14 +1820,16 @@
             damageBossAttack(target, enemy.warning.radius, enemy.warning.damage);
             removeBossTelegraph(enemy);
             enemy.bossState = "ground";
-            enemy.attackCooldown = 1.7;
+            enemy.attackCooldown = enemy.enraged ? 0.95 : 1.7;
           }
           return;
         }
 
-        enemy.ultimateCooldown -= delta;
-        enemy.chargeCooldown -= delta;
-        enemy.attackCooldown -= delta;
+        const cooldownRate = enemy.enraged ? 1.55 : 1;
+        enemy.ultimateCooldown -= delta * cooldownRate;
+        enemy.chargeCooldown -= delta * cooldownRate;
+        enemy.timeStopCooldown -= delta * cooldownRate;
+        enemy.attackCooldown -= delta * cooldownRate;
         if (enemy.ultimateCooldown <= 0) {
           if (warnBossUltimate(enemy)) return;
           enemy.bossState = "ground";
@@ -1732,6 +1848,8 @@
           return;
         }
 
+        if (enemy.timeStopCooldown <= 0 && enemy.timeStopPhase === null && startTimeStopPattern(enemy)) return;
+
         if (distance > enemy.attackRange * 0.82) {
           const step = Math.min(enemy.speed * delta, distance - enemy.attackRange * 0.72);
           enemy.group.position.x += dirX * step;
@@ -1745,15 +1863,16 @@
               "meleeWindup",
               new THREE.Vector3(player.position.x, 0, player.position.z),
               4.8,
-              1.05,
-              35,
+              enemy.enraged ? 0.75 : 1.05,
+              enemy.enraged ? 44 : 35,
             );
           } else {
             const origin = enemy.group.position.clone().add(new THREE.Vector3(0, 6.4, 0));
             enemy.projectileTarget = player.position.clone();
             enemy.projectile = createNosiProjectile(origin, enemy.projectileTarget);
-            enemy.attackDamage = 28;
-            enemy.attackCooldown = 3.6;
+            enemy.attackDamage = enemy.enraged ? 40 : 28;
+            if (enemy.enraged) enemy.projectile.userData.velocity.setLength(24);
+            enemy.attackCooldown = enemy.enraged ? 2.1 : 3.6;
           }
         }
       }
@@ -1761,6 +1880,7 @@
       function removeEnemy(enemy) {
         scene.remove(enemy.group);
         if (enemy.projectile) scene.remove(enemy.projectile);
+        removeTimeStopClock(enemy);
         removeBossTelegraph(enemy);
         for (let index = enemyMeshes.length - 1; index >= 0; index -= 1) {
           let parent = enemyMeshes[index];
@@ -1776,7 +1896,15 @@
 
       function damageEnemy(enemy, amount) {
         if (!enemies.includes(enemy)) return;
-        enemy.hp -= amount;
+        enemy.hp = Math.max(0, enemy.hp - amount);
+        if (enemy.type === "boss" && !enemy.enraged && enemy.hp > 0 && enemy.hp <= enemy.maxHp * 0.3) {
+          enemy.enraged = true;
+          enemy.speed *= 1.4;
+          enemy.attackCooldown = Math.min(enemy.attackCooldown, 0.5);
+          enemy.ultimateCooldown = Math.min(enemy.ultimateCooldown, 1);
+          enemy.chargeCooldown = Math.min(enemy.chargeCooldown, 1);
+          enemy.timeStopCooldown = Math.min(enemy.timeStopCooldown, 3);
+        }
         enemy.group.scale.setScalar(1.12);
         window.setTimeout(() => {
           if (enemies.includes(enemy)) enemy.group.scale.setScalar(1);
@@ -1796,7 +1924,7 @@
       }
 
       function swingSword(heavy = false) {
-        if (state !== "playing" || player.weaponCooldown > 0) return;
+        if (state !== "playing" || player.timeStopTimer > 0 || player.weaponCooldown > 0) return;
         player.weaponCooldown = heavy ? 1.05 * player.hurricaneCooldownScale : 0.38;
         player.swingDuration = heavy ? 0.62 : 0.38;
         player.swingTime = player.swingDuration;
@@ -1835,11 +1963,13 @@
         targetEnemy = findTarget();
         if (!targetEnemy) {
           dom.targetBox.classList.remove("is-visible");
+          dom.targetBox.classList.remove("is-enraged");
           return;
         }
         dom.targetName.textContent = targetEnemy.type === "boss"
-          ? "더미 · 보스"
+          ? targetEnemy.enraged ? "더미 · 광폭화" : "더미 · 보스"
           : targetEnemy.type === "nozzle" ? "노즐 · 추격형" : "노시 · 공중 포격형";
+        dom.targetBox.classList.toggle("is-enraged", targetEnemy.type === "boss" && targetEnemy.enraged);
         dom.targetHealth.textContent = `${Math.max(0, Math.ceil(targetEnemy.hp))} / ${Math.ceil(targetEnemy.maxHp)}`;
         dom.targetFill.style.width = `${Math.max(0, (targetEnemy.hp / targetEnemy.maxHp) * 100)}%`;
         dom.targetBox.classList.add("is-visible");
@@ -1863,6 +1993,15 @@
       }
 
       function updatePlayer(delta) {
+        if (player.timeStopTimer > 0) {
+          player.timeStopTimer = Math.max(0, player.timeStopTimer - delta);
+          player.velocityY = 0;
+          player.dashTime = 0;
+          camera.position.copy(player.position);
+          camera.rotation.set(pitch, yaw, 0, "YXZ");
+          return;
+        }
+
         const forwardInput = Number(keys.has("KeyW")) - Number(keys.has("KeyS"));
         const sideInput = Number(keys.has("KeyD")) - Number(keys.has("KeyA"));
         let inputLength = Math.hypot(forwardInput, sideInput);
@@ -2122,13 +2261,14 @@
       document.addEventListener("keydown", (event) => {
         if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) event.preventDefault();
         if (event.code === "Escape") return;
+        if (state === "playing" && player.timeStopTimer > 0) return;
         if ((event.code === "Space" || event.code.startsWith("Shift")) && event.repeat) return;
         if (event.code === "Space" || event.code.startsWith("Key") || event.code.startsWith("Shift")) keys.add(event.code);
       });
       document.addEventListener("keyup", (event) => keys.delete(event.code));
       window.addEventListener("blur", () => keys.clear());
       document.addEventListener("mousemove", (event) => {
-        if (state !== "playing") return;
+        if (state !== "playing" || player.timeStopTimer > 0) return;
         if (document.pointerLockElement === renderer.domElement || event.target === renderer.domElement) {
           yaw -= event.movementX * 0.0022;
           pitch = THREE.MathUtils.clamp(pitch - event.movementY * 0.0022, -1.38, 1.38);
