@@ -51,6 +51,22 @@
     .hit-flash.is-active { animation: damage-flash 360ms ease-out; }
     @keyframes damage-flash { from { opacity: 1; } to { opacity: 0; } }
 
+    .boss-countdown {
+      position: fixed;
+      z-index: 4;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      gap: 8px;
+      background: rgb(8 12 10 / 48%);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .boss-countdown[hidden] { display: none; }
+    .boss-countdown__title { color: #f0c879; font-size: 13px; font-weight: 800; letter-spacing: .24em; }
+    .boss-countdown__number { color: #fff3d4; font-size: clamp(72px, 18vw, 144px); font-weight: 900; line-height: 1; text-shadow: 0 0 32px rgb(236 105 53 / 65%); }
+
     .hud { position: fixed; z-index: 2; inset: 0; pointer-events: none; }
     .hud-panel {
       border: 1px solid rgb(214 207 182 / 24%);
@@ -298,6 +314,10 @@
     <div id="game-mount" aria-label="3D 콜로세움 게임 화면"></div>
     <div class="vignette"></div>
     <div class="hit-flash" id="hit-flash" aria-hidden="true"></div>
+    <div class="boss-countdown" id="boss-countdown" role="status" aria-live="assertive" hidden>
+      <span class="boss-countdown__title">BOSS · 더미 등장</span>
+      <strong class="boss-countdown__number" id="boss-countdown-number">3</strong>
+    </div>
 
     <section class="hud" aria-label="게임 상태">
       <div class="hud-left hud-panel">
@@ -332,17 +352,18 @@
       <div class="panel" id="intro-panel">
         <div class="eyebrow">ARENA SURVIVAL · FIRST PERSON</div>
         <h1>3D 회피 서바이버</h1>
-        <p class="panel-copy">몰려오는 적을 피하고 포인트를 모아 스테이지에서 탈출하라. 검을 휘둘러 적을 쓰러뜨리고, 상인의 제안으로 다음 전투를 준비하세요.</p>
+        <p class="panel-copy">몰려오는 적을 피하고 포인트를 모아 스테이지에서 탈출하세요. 스테이지가 오를수록 더 많은 적이 한꺼번에 등장하며, 마지막 스테이지에서는 보스 더미와 싸웁니다.</p>
         <div class="key-list">
           <div><kbd>WASD</kbd><span>이동과 회피</span></div>
           <div><kbd>MOUSE</kbd><span>시야 조준</span></div>
           <div><kbd>LEFT CLICK</kbd><span>빠른 검격</span></div>
-          <div><kbd>RIGHT CLICK</kbd><span>회전 허리케인 발사</span></div>
+          <div><kbd>RIGHT CLICK</kbd><span>허리케인 직선 발사</span></div>
           <div><kbd>SHIFT</kbd><span>방향 돌진</span></div>
           <div><kbd>SPACE</kbd><span>점프, 공중에서 2단 점프</span></div>
           <div><kbd>ESC</kbd><span>일시 정지</span></div>
         </div>
         <button class="action-button" id="start-button" type="button">아레나 입장</button>
+        <button class="action-button action-button--quiet" id="boss-start-button" type="button">보스전 바로 시작</button>
       </div>
 
       <div class="panel panel--wide" id="shop-panel" hidden>
@@ -350,14 +371,18 @@
           <div><div class="eyebrow">휴식 구역 · 상인이 나타났다</div><h2>전리품을 고르세요</h2></div>
           <div class="currency">보유 재화 <span id="shop-currency">0</span></div>
         </div>
-        <p class="panel-copy">타원형 상인이 네 팔을 흔들며 다음 전투를 위한 거래를 제안합니다. 살 수 있는 만큼 선택한 뒤 다음 스테이지로 이동하세요.</p>
+        <p class="panel-copy">적 처치와 스테이지 클리어 보상으로 재화를 모아 다음 전투를 준비하세요. 살 수 있는 만큼 선택한 뒤 다음 스테이지로 이동하세요.</p>
         <div class="shop-grid">
           <button class="shop-choice" type="button" data-upgrade="blade"><strong>날 세우기</strong><span>검 공격력이 25% 증가합니다.</span><small>비용 3</small></button>
           <button class="shop-choice" type="button" data-upgrade="vitality"><strong>응급 회복</strong><span>체력을 35 회복하고 최대 체력을 10 늘립니다.</span><small>비용 4</small></button>
           <button class="shop-choice" type="button" data-upgrade="weaken"><strong>노즐 약화</strong><span>적의 이동 속도와 공격력이 15% 감소합니다.</span><small>비용 3</small></button>
           <button class="shop-choice" type="button" data-upgrade="fracture"><strong>균열의 표식</strong><span>적의 체력이 20% 감소합니다.</span><small>비용 4</small></button>
+          <button class="shop-choice" type="button" data-upgrade="hurricaneCount"><strong>회오리 분열</strong><span>우클릭 허리케인이 좌우로 퍼져 나갑니다. 최대 3발까지 발사합니다.</span><small>비용 5</small></button>
+          <button class="shop-choice" type="button" data-upgrade="hurricaneDamage"><strong>화염 압축</strong><span>우클릭 허리케인 공격력이 25% 증가합니다.</span><small>비용 4</small></button>
+          <button class="shop-choice" type="button" data-upgrade="hurricaneCooldown"><strong>신속한 재장전</strong><span>우클릭 허리케인의 재사용 대기시간이 15% 감소합니다.</span><small>비용 4</small></button>
+          <button class="shop-choice" id="healing-spring-button" type="button"><strong>회복의 샘</strong><span>코인을 내고 체력을 40 회복합니다. 재화가 남아 있으면 횟수 제한 없이 이용할 수 있습니다.</span><small>비용 3</small></button>
         </div>
-        <div class="button-row"><button class="action-button" id="next-stage-button" type="button">상점 종료 · 다음 스테이지</button><button class="action-button action-button--quiet" id="skip-shop-button" type="button">구매 없이 계속</button></div>
+        <div class="button-row"><button class="action-button" id="next-stage-button" type="button">상점 종료 · 다음 스테이지</button><button class="action-button action-button--quiet" id="skip-shop-button" type="button">구매 없이 계속</button><button class="action-button action-button--quiet" id="boss-shortcut-button" type="button">보스전 바로 가기</button></div>
       </div>
 
       <div class="panel" id="pause-panel" hidden>
@@ -393,8 +418,13 @@
       const mount = $("#game-mount");
       const errorNote = $("#error-note");
       const startButton = $("#start-button");
+      const bossStartButton = $("#boss-start-button");
+      const bossCountdown = $("#boss-countdown");
+      const bossCountdownNumber = $("#boss-countdown-number");
       startButton.disabled = true;
       startButton.textContent = "드래곤 불러오는 중...";
+      bossStartButton.disabled = true;
+      bossStartButton.textContent = "보스 불러오는 중...";
 
       let renderer;
       try {
@@ -449,6 +479,30 @@
         nosiProjectileAnimations = gltf.animations;
       }, undefined, (error) => {
         console.error("노시 투사체 모델을 불러오지 못했습니다.", error);
+      });
+
+      let mountainDragonTemplate = null;
+      let mountainDragonAnimations = [];
+      const mountainDragonLoader = new GLTFLoader();
+      mountainDragonLoader.load("assets/models/mountain_dragon/scene.gltf", (gltf) => {
+        mountainDragonTemplate = gltf.scene;
+        mountainDragonAnimations = gltf.animations;
+        bossStartButton.disabled = false;
+        bossStartButton.textContent = "보스전 바로 시작";
+      }, undefined, (error) => {
+        console.error("더미 보스 모델을 불러오지 못했습니다.", error);
+        bossStartButton.disabled = false;
+        bossStartButton.textContent = "보스전 바로 시작";
+      });
+
+      let explosionVfxTemplate = null;
+      let explosionVfxAnimations = [];
+      const explosionVfxLoader = new GLTFLoader();
+      explosionVfxLoader.load("assets/models/megumin_explosion_vfx/scene.gltf", (gltf) => {
+        explosionVfxTemplate = gltf.scene;
+        explosionVfxAnimations = gltf.animations;
+      }, undefined, (error) => {
+        console.error("더미 필살기 폭발 VFX를 불러오지 못했습니다.", error);
       });
 
       let hurricaneVfxTemplate = null;
@@ -563,6 +617,8 @@
       lowerRim.position.y = 0.14;
       arenaFallback.add(lowerRim);
 
+      const stepRiserMaterial = new THREE.MeshStandardMaterial({ color: 0x414b43, roughness: 0.98, side: THREE.DoubleSide });
+
       const pillars = [];
 
       let colonnetteTemplate = null;
@@ -626,19 +682,66 @@
         console.error("콜로세움 기둥 모델을 불러오지 못했습니다.", error);
       });
 
-      for (let index = 0; index < 18; index += 1) {
-        const angle = (index / 18) * Math.PI * 2;
-        const torch = new THREE.Group();
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.19, 2.2, 8), darkStone);
-        stem.position.y = 1.1;
-        const flame = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 1), new THREE.MeshBasicMaterial({ color: 0xf2a65a }));
-        flame.position.y = 2.35;
-        torch.add(stem, flame);
-        torch.position.set(Math.cos(angle) * 32.2, 0, Math.sin(angle) * 32.2);
-        scene.add(torch);
-        const glow = new THREE.PointLight(0xffad60, 1.5, 8, 2);
-        glow.position.copy(torch.position).add(new THREE.Vector3(0, 2.6, 0));
-        scene.add(glow);
+      const stairInnerRadius = 34.2;
+      const stairWidth = 1.28;
+      const stairStepHeight = 0.38;
+      const stairCount = 5;
+      const stairBrickGeometry = new THREE.BoxGeometry(1, stairStepHeight, 0.78);
+      const stairBrickMaterials = [
+        new THREE.MeshStandardMaterial({ color: 0x88816f, roughness: 0.94 }),
+        new THREE.MeshStandardMaterial({ color: 0x756f62, roughness: 0.96 }),
+        new THREE.MeshStandardMaterial({ color: 0x98907b, roughness: 0.92 }),
+      ];
+      const stairBrickCount = 72;
+      const stairBricks = Array.from({ length: stairCount }, (_, index) => {
+        const bricks = new THREE.InstancedMesh(
+          stairBrickGeometry,
+          stairBrickMaterials[index % stairBrickMaterials.length],
+          stairBrickCount,
+        );
+        bricks.castShadow = true;
+        bricks.receiveShadow = true;
+        arenaFallback.add(bricks);
+        return bricks;
+      });
+      const stairBrickTransform = new THREE.Object3D();
+
+      for (let index = 0; index < stairCount; index += 1) {
+        const innerRadius = stairInnerRadius + index * stairWidth;
+        const outerRadius = innerRadius + stairWidth;
+        const stepHeight = stairStepHeight;
+        const topHeight = (index + 1) * stepHeight;
+        const tread = new THREE.Mesh(
+          new THREE.RingGeometry(innerRadius, outerRadius, 88),
+          index % 2 === 0 ? stoneLight : stone,
+        );
+        tread.rotation.x = -Math.PI / 2;
+        tread.position.y = topHeight;
+        arenaFallback.add(tread);
+        const riser = new THREE.Mesh(
+          new THREE.CylinderGeometry(innerRadius, innerRadius, stepHeight, 88, 1, true),
+          stepRiserMaterial,
+        );
+        riser.position.y = topHeight - stepHeight / 2;
+        arenaFallback.add(riser);
+
+        const brickRadius = innerRadius + 0.39;
+        const brickWidth = (2 * Math.PI * brickRadius / stairBrickCount) * 0.92;
+        const brickLayer = stairBricks[index];
+        for (let brickIndex = 0; brickIndex < stairBrickCount; brickIndex += 1) {
+          const angle = (brickIndex / stairBrickCount) * Math.PI * 2;
+          stairBrickTransform.position.set(
+            Math.sin(angle) * brickRadius,
+            topHeight - stepHeight / 2,
+            Math.cos(angle) * brickRadius,
+          );
+          stairBrickTransform.rotation.set(0, angle, 0);
+          stairBrickTransform.scale.set(brickWidth, 1, 1);
+          stairBrickTransform.updateMatrix();
+          brickLayer.setMatrixAt(brickIndex, stairBrickTransform.matrix);
+        }
+        brickLayer.instanceMatrix.needsUpdate = true;
+        brickLayer.computeBoundingSphere();
       }
 
       const player = {
@@ -766,6 +869,7 @@
       const keys = new Set();
       const enemies = [];
       const slashProjectiles = [];
+      const explosionEffects = [];
       const raycaster = new THREE.Raycaster();
       raycaster.far = 30;
       const center = new THREE.Vector2(0, 0);
@@ -776,6 +880,8 @@
       let state = "intro";
       let pointerLockWasActive = false;
       let stage = 1;
+      let bossCountdownTimer = 0;
+      let bossCountdownDisplayed = 0;
       let score = 0;
       let currency = 0;
       let enemiesToSpawn = 10;
@@ -788,6 +894,16 @@
       let enemySpeedScale = 1;
       let enemyDamageScale = 1;
       let toastTimer = 0;
+      const upgradeOptions = {
+        blade: { cost: 3, max: 1 },
+        vitality: { cost: 4, max: 1 },
+        weaken: { cost: 3, max: 1 },
+        fracture: { cost: 4, max: 1 },
+        hurricaneCount: { cost: 5, max: 2 },
+        hurricaneDamage: { cost: 4, max: 3 },
+        hurricaneCooldown: { cost: 4, max: 3 },
+      };
+      const upgradeLevels = Object.fromEntries(Object.keys(upgradeOptions).map((upgrade) => [upgrade, 0]));
 
       const dom = {
         health: $("#health-text"), maxHealth: $("#max-health-text"), healthFill: $("#health-fill"),
@@ -795,6 +911,7 @@
         currency: $("#currency-value"), time: $("#time-value"), stage: $("#stage-value"),
         targetBox: $("#target-box"), targetName: $("#target-name"), targetHealth: $("#target-health"),
         targetFill: $("#target-fill"), shopCurrency: $("#shop-currency"),
+        healingSpring: $("#healing-spring-button"),
       };
 
       function setPanel(panelSelector) {
@@ -815,9 +932,15 @@
         dom.stage.textContent = stage;
         dom.shopCurrency.textContent = currency;
         document.querySelectorAll("[data-upgrade]").forEach((button) => {
-          const prices = { blade: 3, vitality: 4, weaken: 3, fracture: 4 };
-          button.disabled = currency < prices[button.dataset.upgrade];
+          const upgrade = button.dataset.upgrade;
+          const option = upgradeOptions[upgrade];
+          const level = upgradeLevels[upgrade];
+          button.disabled = currency < option.cost || level >= option.max;
+          button.querySelector("small").textContent = level >= option.max
+            ? "최대 강화"
+            : `비용 ${option.cost} · ${level}/${option.max}`;
         });
+        dom.healingSpring.disabled = currency < 3 || player.health >= player.maxHealth;
       }
 
       function addMesh(group, geometry, material, position, scale) {
@@ -950,15 +1073,228 @@
         enemy.attackCooldown = 1.8;
       }
 
+      function makeDummyBoss(enemy) {
+        const group = new THREE.Group();
+        if (mountainDragonTemplate) {
+          const model = cloneSkinnedModel(mountainDragonTemplate);
+          model.traverse((object) => {
+            if (object.isMesh) {
+              object.castShadow = true;
+              object.receiveShadow = true;
+              object.frustumCulled = false;
+            }
+          });
+          model.updateMatrixWorld(true);
+          const bounds = new THREE.Box3().setFromObject(model);
+          const size = bounds.getSize(new THREE.Vector3());
+          const center = bounds.getCenter(new THREE.Vector3());
+          const scale = 12 / Math.max(size.x, size.y, size.z, 0.001);
+          model.scale.setScalar(scale);
+          model.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
+          group.add(model);
+          enemy.model = model;
+          enemy.mixer = new THREE.AnimationMixer(model);
+          enemy.actions = mountainDragonAnimations.map((clip) => enemy.mixer.clipAction(clip));
+          enemy.actions.forEach((action) => action.play());
+          enemy.modelRoot = model.getObjectByName("root_01_8");
+          enemy.modelRootRotation = enemy.modelRoot?.quaternion.clone();
+        } else {
+          const body = addMesh(group, new THREE.SphereGeometry(3.4, 18, 14), new THREE.MeshStandardMaterial({ color: 0x66504a, roughness: 0.68 }), [0, 3.4, 0]);
+          body.scale.set(1.35, 1, 1.8);
+          for (const side of [-1, 1]) {
+            const wing = addMesh(group, new THREE.ConeGeometry(2.2, 5, 6), new THREE.MeshStandardMaterial({ color: 0x453b3d, side: THREE.DoubleSide }), [side * 3.2, 4.2, 0], [1, 1, 0.28]);
+            wing.rotation.z = side * -0.5;
+          }
+        }
+        enemy.group = group;
+        enemy.attackRange = 7.5;
+        enemy.attackDamage = 26;
+        enemy.speed = 2.35;
+        enemy.attackCooldown = 2.8;
+        enemy.ultimateCooldown = 8;
+        enemy.chargeCooldown = 7;
+        enemy.bossState = "ground";
+        enemy.bossStateTimer = 0;
+        enemy.flightHeight = 17;
+      }
+
+      function createBossTelegraph(point, radius) {
+        const warning = new THREE.Group();
+        const disk = new THREE.Mesh(
+          new THREE.CircleGeometry(radius, 48),
+          new THREE.MeshBasicMaterial({ color: 0xf04e35, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide }),
+        );
+        disk.rotation.x = -Math.PI / 2;
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(radius - 0.16, radius, 48),
+          new THREE.MeshBasicMaterial({ color: 0xffb05c, transparent: true, opacity: 0.92, depthWrite: false, side: THREE.DoubleSide }),
+        );
+        ring.rotation.x = -Math.PI / 2;
+        warning.add(disk, ring);
+        warning.position.set(point.x, 0.08, point.z);
+        scene.add(warning);
+        return { group: warning, disk, ring };
+      }
+
+      function removeBossTelegraph(enemy) {
+        if (!enemy.warning) return;
+        const warning = enemy.warning;
+        scene.remove(warning.group);
+        warning.disk?.geometry.dispose();
+        warning.disk?.material.dispose();
+        warning.ring?.geometry.dispose();
+        warning.ring?.material.dispose();
+        if (enemy.warning.lane) {
+          enemy.warning.lane.geometry.dispose();
+          enemy.warning.lane.material.dispose();
+        }
+        warning.mixer?.stopAllAction();
+        const effectIndex = explosionEffects.indexOf(warning);
+        if (effectIndex >= 0) explosionEffects.splice(effectIndex, 1);
+        enemy.warning = null;
+      }
+
+      function warnBossAttack(enemy, stateName, point, radius, duration, damage) {
+        enemy.bossState = stateName;
+        enemy.bossStateTimer = duration;
+        enemy.warning = {
+          ...createBossTelegraph(point, radius),
+          point: new THREE.Vector3(point.x, 0, point.z),
+          radius,
+          damage,
+          duration,
+        };
+      }
+
+      function warnBossUltimate(enemy) {
+        if (!explosionVfxTemplate || explosionVfxAnimations.length === 0) {
+          console.error("더미 필살기를 시작할 수 없습니다. 필살기 VFX가 아직 준비되지 않았습니다.");
+          enemy.ultimateCooldown = 2;
+          return false;
+        }
+        const point = new THREE.Vector3(
+          player.position.x,
+          getStairHeight(player.position.x, player.position.z),
+          player.position.z,
+        );
+        enemy.warning = createExplosionVfx(point);
+        enemy.warning.radius = 12;
+        enemy.warning.damage = 12;
+        enemy.warning.damageStart = 5;
+        enemy.warning.damageInterval = 0.65;
+        enemy.warning.nextDamageAt = enemy.warning.damageStart;
+        enemy.bossState = "ultimateRise";
+        enemy.bossStateTimer = enemy.warning.duration;
+        return true;
+      }
+
+      function warnBossCharge(enemy, start, end) {
+        const length = start.distanceTo(end);
+        const warning = createBossTelegraph(end, 2.8);
+        const lane = new THREE.Mesh(
+          new THREE.BoxGeometry(3.2, 0.035, length),
+          new THREE.MeshBasicMaterial({ color: 0xff613d, transparent: true, opacity: 0.42, depthWrite: false }),
+        );
+        lane.position.set((start.x - end.x) / 2, 0.01, (start.z - end.z) / 2);
+        lane.rotation.y = Math.atan2(end.x - start.x, end.z - start.z);
+        warning.group.add(lane);
+        enemy.warning = {
+          ...warning,
+          lane,
+          point: end.clone(),
+          radius: 2.8,
+          damage: 42,
+          duration: 1.35,
+        };
+        enemy.bossState = "chargeWindup";
+        enemy.bossStateTimer = enemy.warning.duration;
+        enemy.chargeStart = start.clone();
+        enemy.chargeEnd = end.clone();
+      }
+
+      function damageBossAttack(point, radius, damage, force = false) {
+        const distance = Math.hypot(player.position.x - point.x, player.position.z - point.z);
+        const playerHeight = player.position.y - 1.68;
+        if (distance <= radius && (force || playerHeight < 3.2)) damagePlayer(damage, force);
+      }
+
+      function createExplosionVfx(point) {
+        const model = cloneSkinnedModel(explosionVfxTemplate);
+        model.scale.setScalar(0.12);
+        model.traverse((object) => {
+          if (object.isMesh) object.frustumCulled = false;
+        });
+        for (const nodeName of ["7", "8"]) {
+          model.getObjectByName(nodeName)?.traverse((object) => {
+            if (object.isMesh) object.scale.multiplyScalar(2.5);
+          });
+        }
+        const clip = explosionVfxAnimations[0].clone();
+        clip.tracks.forEach((track) => {
+          const [nodeName, property] = track.name.split(".");
+          if (property !== "position" || (nodeName !== "7" && nodeName !== "8")) return;
+          for (let index = 1; index < track.values.length; index += 3) {
+            track.values[index] *= 0.06;
+          }
+        });
+        const mixer = new THREE.AnimationMixer(model);
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+        action.play();
+        const group = new THREE.Group();
+        group.add(model);
+        group.position.copy(point);
+        const effect = {
+          group,
+          mixer,
+          age: 0,
+          duration: clip.duration,
+          point: point.clone(),
+        };
+        scene.add(group);
+        explosionEffects.push(effect);
+        return effect;
+      }
+
+      function updateExplosionEffects(delta) {
+        for (let index = explosionEffects.length - 1; index >= 0; index -= 1) {
+          const effect = explosionEffects[index];
+          effect.age += delta;
+          effect.group.rotation.y += delta * 3.2;
+          effect.mixer?.update(delta);
+          while (effect.damageInterval
+              && effect.age >= effect.nextDamageAt
+              && effect.nextDamageAt < effect.duration) {
+            damageBossAttack(effect.point, effect.radius, effect.damage, true);
+            effect.nextDamageAt += effect.damageInterval;
+          }
+          if (effect.age >= effect.duration) {
+            scene.remove(effect.group);
+            effect.mixer?.stopAllAction();
+            explosionEffects.splice(index, 1);
+          }
+        }
+      }
+
+      function clearExplosionEffects() {
+        while (explosionEffects.length > 0) {
+          const effect = explosionEffects.pop();
+          scene.remove(effect.group);
+          effect.mixer?.stopAllAction();
+        }
+      }
+
       function eyeMaterial() {
         return new THREE.MeshStandardMaterial({ color: 0xe1a15b, emissive: 0x8c361b, emissiveIntensity: 1.5 });
       }
 
       function createEnemy(type) {
+        const isBoss = type === "boss";
         const enemy = {
           type,
-          hp: (type === "nozzle" ? 96 : 72) * enemyHealthScale,
-          maxHp: (type === "nozzle" ? 96 : 72) * enemyHealthScale,
+          hp: (isBoss ? 2500 : type === "nozzle" ? 96 : 72) * enemyHealthScale,
+          maxHp: (isBoss ? 2500 : type === "nozzle" ? 96 : 72) * enemyHealthScale,
           attackCooldown: type === "nozzle" ? 0.7 : 1.8 + Math.random() * 1.4,
           age: Math.random() * 3,
           telegraph: 0,
@@ -966,9 +1302,10 @@
           warning: null,
         };
         if (type === "nozzle") makeNozzle(enemy);
-        else makeNosi(enemy);
+        else if (type === "nosi") makeNosi(enemy);
+        else makeDummyBoss(enemy);
         const angle = Math.random() * Math.PI * 2;
-        const distance = 14 + Math.random() * 10;
+        const distance = isBoss ? 20 : 14 + Math.random() * 10;
         enemy.group.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
         enemy.group.userData.enemy = enemy;
         enemy.group.traverse((object) => {
@@ -980,15 +1317,44 @@
 
       function remainingCount() { return enemiesToSpawn + enemies.length; }
 
-      function startRun() {
+      function startBossCountdown() {
+        bossCountdownTimer = 3;
+        bossCountdownDisplayed = 3;
+        bossCountdownNumber.textContent = "3";
+        bossCountdown.hidden = false;
+        state = "boss-intro";
+      }
+
+      function updateBossCountdown(delta) {
+        if (bossCountdownTimer <= 0) return;
+        bossCountdownTimer = Math.max(0, bossCountdownTimer - delta);
+        const nextNumber = Math.ceil(bossCountdownTimer);
+        if (nextNumber > 0 && nextNumber !== bossCountdownDisplayed) {
+          bossCountdownDisplayed = nextNumber;
+          bossCountdownNumber.textContent = String(nextNumber);
+        }
+        if (bossCountdownTimer === 0) {
+          bossCountdown.hidden = true;
+          state = "playing";
+          updateHud();
+        }
+      }
+
+      function startRun(startAtBoss = false) {
         clearSlashProjectiles();
-        stage = 1;
+        bossCountdownTimer = 0;
+        bossCountdown.hidden = true;
+        stage = startAtBoss ? 5 : 1;
         score = 0;
         currency = 0;
         elapsed = 0;
         player.health = player.maxHealth = 100;
         player.damage = 48;
         player.damageScale = 1;
+        player.hurricaneCount = 1;
+        player.hurricaneDamageScale = 1;
+        player.hurricaneCooldownScale = 1;
+        Object.keys(upgradeLevels).forEach((upgrade) => { upgradeLevels[upgrade] = 0; });
         player.speed = 8.2;
         player.position.set(0, 1.68, 0);
         player.velocityY = 0;
@@ -1000,7 +1366,12 @@
         player.dashReady = true;
         enemyHealthScale = enemySpeedScale = enemyDamageScale = 1;
         enemiesToSpawn = 0;
-        enemies.splice(0).forEach((enemy) => scene.remove(enemy.group));
+        enemies.splice(0).forEach((enemy) => {
+          scene.remove(enemy.group);
+          if (enemy.projectile) scene.remove(enemy.projectile);
+          removeBossTelegraph(enemy);
+        });
+        clearExplosionEffects();
         enemyMeshes.length = 0;
         merchant.visible = false;
         yaw = 0;
@@ -1012,21 +1383,22 @@
 
       function startStage(firstStage = false) {
         if (!firstStage) stage += 1;
-        state = "playing";
-        enemiesToSpawn = 10 * (2 ** (stage - 1));
-        createEnemy(stage % 3 === 0 ? "nosi" : "nozzle");
+        state = stage === 5 ? "boss-intro" : "playing";
+        enemiesToSpawn = stage === 5 ? 1 : 10 * (2 ** (stage - 1));
+        createEnemy(stage === 5 ? "boss" : stage % 3 === 0 ? "nosi" : "nozzle");
         enemiesToSpawn -= 1;
-        spawnTimer = 5;
+        spawnTimer = 3;
         merchant.visible = false;
         setPanel(null);
         updateHud();
+        if (stage === 5) startBossCountdown();
         tryLockPointer();
       }
 
       function showShop() {
         state = "shop";
         clearSlashProjectiles();
-        currency += 2 + stage;
+        currency += 5 + stage * 2;
         merchant.visible = true;
         merchant.position.set(0, 0, 0);
         merchant.rotation.y = Math.PI;
@@ -1038,6 +1410,13 @@
       function showEnd(won) {
         state = won ? "won" : "lost";
         clearSlashProjectiles();
+        enemies.forEach((enemy) => {
+          if (enemy.projectile) {
+            scene.remove(enemy.projectile);
+            enemy.projectile = null;
+          }
+          removeBossTelegraph(enemy);
+        });
         if (document.pointerLockElement) document.exitPointerLock();
         $("#end-eyebrow").textContent = won ? "ARENA CONQUERED" : "RUN ENDED";
         $("#end-title").textContent = won ? "아레나 정복" : "전투 종료";
@@ -1089,17 +1468,12 @@
         const direction = target.clone().sub(origin).normalize();
         projectile.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
         projectile.position.copy(origin);
-        const referenceUp = Math.abs(direction.y) > 0.92 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-        const spiralRight = new THREE.Vector3().crossVectors(direction, referenceUp).normalize();
-        const spiralUp = new THREE.Vector3().crossVectors(spiralRight, direction).normalize();
+        const animationMixer = projectile.userData.animationMixer;
         projectile.userData = {
+          animationMixer,
           velocity: direction.clone().multiplyScalar(18),
           direction,
           origin: origin.clone(),
-          spiralRight,
-          spiralUp,
-          spiralRadius: 1.15,
-          spiralRate: 18,
           age: 0,
           travelDistance: origin.distanceTo(target),
         };
@@ -1119,13 +1493,14 @@
         return new THREE.ShapeGeometry(shape);
       }
 
-      function launchSlashProjectile() {
+      function launchSlashProjectile(yawOffset = 0) {
+        const projectileYaw = yaw + yawOffset;
         const direction = new THREE.Vector3(
-          -Math.sin(yaw) * Math.cos(pitch),
+          -Math.sin(projectileYaw) * Math.cos(pitch),
           Math.sin(pitch),
-          -Math.cos(yaw) * Math.cos(pitch),
+          -Math.cos(projectileYaw) * Math.cos(pitch),
         ).normalize();
-        const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+        const right = new THREE.Vector3(Math.cos(projectileYaw), 0, -Math.sin(projectileYaw));
         const origin = player.position.clone()
           .addScaledVector(direction, 1.2)
           .addScaledVector(right, 0.34)
@@ -1175,7 +1550,7 @@
         slashProjectiles.push({
           mesh,
           velocity: direction.multiplyScalar(22),
-          damage: player.damage * player.damageScale * 1.6,
+          damage: player.damage * player.damageScale * player.hurricaneDamageScale * 1.6,
           distance: 0,
           maxDistance: 29,
           life: 29 / 22,
@@ -1192,7 +1567,6 @@
           projectile.mesh.position.addScaledVector(projectile.velocity, delta);
           projectile.mesh.userData.animationMixer?.update(delta);
           if (projectile.sharedModel) {
-            projectile.mesh.rotateZ(delta * 7.5);
             if (projectile.life < 0.18) projectile.mesh.scale.setScalar(Math.max(0.01, projectile.life / 0.18));
           }
           projectile.distance += step;
@@ -1229,8 +1603,8 @@
         while (slashProjectiles.length > 0) disposeSlashProjectile(slashProjectiles.pop());
       }
 
-      function damagePlayer(amount) {
-        if (player.invulnerable > 0 || state !== "playing") return;
+      function damagePlayer(amount, ignoreInvulnerability = false) {
+        if ((!ignoreInvulnerability && player.invulnerable > 0) || state !== "playing") return;
         player.health = Math.max(0, player.health - amount * enemyDamageScale);
         player.invulnerable = 0.42;
         const hitFlash = $("#hit-flash");
@@ -1241,9 +1615,153 @@
         if (player.health <= 0) showEnd(false);
       }
 
+      function updateEnemyProjectile(enemy, delta) {
+        if (!enemy.projectile) return;
+        const flight = enemy.projectile.userData;
+        flight.age += delta;
+        const travelled = Math.min(flight.travelDistance, flight.velocity.length() * flight.age);
+        enemy.projectile.position.copy(flight.origin).addScaledVector(flight.direction, travelled);
+        flight.animationMixer?.update(delta);
+        const hitPlayer = enemy.projectile.position.distanceTo(player.position) < 1.15;
+        if (hitPlayer) damagePlayer(enemy.attackDamage);
+        if (hitPlayer || travelled >= flight.travelDistance) {
+          scene.remove(enemy.projectile);
+          enemy.projectile = null;
+        }
+      }
+
+      function updateBoss(enemy, delta, distance, dirX, dirZ) {
+        enemy.mixer?.update(delta);
+        if (enemy.modelRoot && enemy.modelRootRotation) {
+          enemy.modelRoot.quaternion.copy(enemy.modelRootRotation);
+        }
+        updateEnemyProjectile(enemy, delta);
+
+        if (enemy.warning) {
+          const pulse = 0.5 + Math.sin((enemy.bossStateTimer / Math.max(enemy.warning.duration, 0.01)) * Math.PI * 12) * 0.5;
+          if (enemy.warning.lane) enemy.warning.lane.material.opacity = 0.22 + pulse * 0.42;
+          if (enemy.warning.disk) enemy.warning.disk.material.opacity = 0.13 + pulse * 0.13;
+          if (enemy.warning.ring) enemy.warning.ring.material.opacity = 0.55 + pulse * 0.4;
+        }
+
+        if (enemy.bossState === "ultimateRise") {
+          enemy.bossStateTimer -= delta;
+          enemy.group.position.y += (enemy.flightHeight - enemy.group.position.y) * Math.min(1, delta * 2.5);
+          if (enemy.bossStateTimer <= 0) {
+            damageBossAttack(enemy.warning.point, enemy.warning.radius, enemy.warning.damage, true);
+            removeBossTelegraph(enemy);
+            enemy.bossState = "ultimateDescend";
+            enemy.bossStateTimer = 1.8;
+          }
+          return;
+        }
+
+        if (enemy.bossState === "ultimateDescend") {
+          enemy.bossStateTimer -= delta;
+          enemy.group.position.y += (0 - enemy.group.position.y) * Math.min(1, delta * 2.2);
+          if (enemy.bossStateTimer <= 0) {
+            enemy.group.position.y = 0;
+            enemy.bossState = "ground";
+            enemy.ultimateCooldown = 19;
+            enemy.attackCooldown = 1.5;
+          }
+          return;
+        }
+
+        if (enemy.bossState === "chargeWindup") {
+          enemy.bossStateTimer -= delta;
+          if (enemy.bossStateTimer <= 0) {
+            enemy.bossState = "charge";
+            enemy.bossStateTimer = 0.78;
+            enemy.chargeHit = false;
+          }
+          return;
+        }
+
+        if (enemy.bossState === "charge") {
+          enemy.bossStateTimer -= delta;
+          const progress = THREE.MathUtils.clamp(1 - enemy.bossStateTimer / 0.78, 0, 1);
+          enemy.group.position.lerpVectors(enemy.chargeStart, enemy.chargeEnd, progress);
+          const chargeX = enemy.chargeEnd.x - enemy.chargeStart.x;
+          const chargeZ = enemy.chargeEnd.z - enemy.chargeStart.z;
+          enemy.group.rotation.y = Math.atan2(chargeX, chargeZ);
+          if (!enemy.chargeHit
+              && Math.hypot(player.position.x - enemy.group.position.x, player.position.z - enemy.group.position.z) < 2.8) {
+            damagePlayer(42);
+            enemy.chargeHit = true;
+          }
+          if (enemy.bossStateTimer <= 0) {
+            removeBossTelegraph(enemy);
+            enemy.bossState = "ground";
+            enemy.chargeCooldown = 10;
+            enemy.attackCooldown = 1.2;
+          }
+          return;
+        }
+
+        if (enemy.bossState === "meleeWindup") {
+          enemy.bossStateTimer -= delta;
+          if (enemy.bossStateTimer <= 0) {
+            const target = enemy.warning.point.clone();
+            damageBossAttack(target, enemy.warning.radius, enemy.warning.damage);
+            removeBossTelegraph(enemy);
+            enemy.bossState = "ground";
+            enemy.attackCooldown = 1.7;
+          }
+          return;
+        }
+
+        enemy.ultimateCooldown -= delta;
+        enemy.chargeCooldown -= delta;
+        enemy.attackCooldown -= delta;
+        if (enemy.ultimateCooldown <= 0) {
+          if (warnBossUltimate(enemy)) return;
+          enemy.bossState = "ground";
+          enemy.ultimateCooldown = 2;
+          return;
+        }
+
+        if (enemy.chargeCooldown <= 0 && distance > 9) {
+          const start = enemy.group.position.clone();
+          const direction = new THREE.Vector3(dirX, 0, dirZ);
+          const chargeDistance = Math.min(distance + 2.5, 24);
+          const end = start.clone().addScaledVector(direction, chargeDistance);
+          const endRadius = Math.hypot(end.x, end.z);
+          if (endRadius > 31) end.setLength(31);
+          warnBossCharge(enemy, start, end);
+          return;
+        }
+
+        if (distance > enemy.attackRange * 0.82) {
+          const step = Math.min(enemy.speed * delta, distance - enemy.attackRange * 0.72);
+          enemy.group.position.x += dirX * step;
+          enemy.group.position.z += dirZ * step;
+        }
+
+        if (enemy.attackCooldown <= 0) {
+          if (distance <= enemy.attackRange) {
+            warnBossAttack(
+              enemy,
+              "meleeWindup",
+              new THREE.Vector3(player.position.x, 0, player.position.z),
+              4.8,
+              1.05,
+              35,
+            );
+          } else {
+            const origin = enemy.group.position.clone().add(new THREE.Vector3(0, 6.4, 0));
+            enemy.projectileTarget = player.position.clone();
+            enemy.projectile = createNosiProjectile(origin, enemy.projectileTarget);
+            enemy.attackDamage = 28;
+            enemy.attackCooldown = 3.6;
+          }
+        }
+      }
+
       function removeEnemy(enemy) {
         scene.remove(enemy.group);
         if (enemy.projectile) scene.remove(enemy.projectile);
+        removeBossTelegraph(enemy);
         for (let index = enemyMeshes.length - 1; index >= 0; index -= 1) {
           let parent = enemyMeshes[index];
           while (parent && parent !== enemy.group) parent = parent.parent;
@@ -1251,6 +1769,7 @@
         }
         enemies.splice(enemies.indexOf(enemy), 1);
         score += 1;
+        currency += enemy.type === "boss" ? 20 : enemy.type === "nosi" ? 2 : 1;
         if (targetEnemy === enemy) targetEnemy = null;
         updateHud();
       }
@@ -1278,12 +1797,15 @@
 
       function swingSword(heavy = false) {
         if (state !== "playing" || player.weaponCooldown > 0) return;
-        player.weaponCooldown = heavy ? 1.05 : 0.38;
+        player.weaponCooldown = heavy ? 1.05 * player.hurricaneCooldownScale : 0.38;
         player.swingDuration = heavy ? 0.62 : 0.38;
         player.swingTime = player.swingDuration;
         player.swingHeavy = heavy;
         if (heavy) {
-          launchSlashProjectile();
+          for (let index = 0; index < player.hurricaneCount; index += 1) {
+            const spread = (index - (player.hurricaneCount - 1) / 2) * 0.18;
+            launchSlashProjectile(spread);
+          }
           return;
         }
         targetEnemy = findTarget();
@@ -1315,18 +1837,29 @@
           dom.targetBox.classList.remove("is-visible");
           return;
         }
-        dom.targetName.textContent = targetEnemy.type === "nozzle" ? "노즐 · 추격형" : "노시 · 공중 포격형";
+        dom.targetName.textContent = targetEnemy.type === "boss"
+          ? "더미 · 보스"
+          : targetEnemy.type === "nozzle" ? "노즐 · 추격형" : "노시 · 공중 포격형";
         dom.targetHealth.textContent = `${Math.max(0, Math.ceil(targetEnemy.hp))} / ${Math.ceil(targetEnemy.maxHp)}`;
         dom.targetFill.style.width = `${Math.max(0, (targetEnemy.hp / targetEnemy.maxHp) * 100)}%`;
         dom.targetBox.classList.add("is-visible");
       }
 
       function canMoveTo(x, z, feet) {
-        if (Math.hypot(x, z) > 52) return false;
+        const radius = Math.hypot(x, z);
+        if (radius > 40.6) return false;
+        if (getStairHeight(x, z) > feet + stairStepHeight + 0.04) return false;
         for (const pillar of pillars) {
           if (Math.hypot(x - pillar.x, z - pillar.z) < pillar.radius + 0.48 && feet < pillar.height - 0.12) return false;
         }
         return true;
+      }
+
+      function getStairHeight(x, z) {
+        const radius = Math.hypot(x, z);
+        if (radius < stairInnerRadius) return 0;
+        const step = Math.floor((radius - stairInnerRadius) / stairWidth);
+        return Math.min(stairCount, step + 1) * stairStepHeight;
       }
 
       function updatePlayer(delta) {
@@ -1385,14 +1918,15 @@
         const oldFeet = player.position.y - 1.68;
         player.velocityY -= 18 * delta;
         player.position.y += player.velocityY * delta;
-        let landingHeight = 0;
+        let landingHeight = getStairHeight(player.position.x, player.position.z);
         for (const pillar of pillars) {
           if (Math.hypot(player.position.x - pillar.x, player.position.z - pillar.z) < pillar.radius - 0.08
               && oldFeet >= pillar.height - 0.12 && player.position.y - 1.68 <= pillar.height && player.velocityY < 0) {
             landingHeight = Math.max(landingHeight, pillar.height);
           }
         }
-        if (player.position.y - 1.68 <= landingHeight) {
+        const canStepOntoStair = player.velocityY < 0 && oldFeet >= landingHeight - stairStepHeight - 0.04;
+        if (player.position.y - 1.68 <= landingHeight && (oldFeet >= landingHeight - 0.12 || canStepOntoStair)) {
           player.position.y = landingHeight + 1.68;
           player.velocityY = 0;
           player.jumpsLeft = 2;
@@ -1431,8 +1965,17 @@
           const distance = Math.hypot(toPlayerX, toPlayerZ) || 0.001;
           const dirX = toPlayerX / distance;
           const dirZ = toPlayerZ / distance;
-          const headingOffset = enemy.type === "nozzle" ? Math.PI : Math.PI / 2;
-          enemy.group.rotation.y = Math.atan2(-dirX, -dirZ) + headingOffset;
+          if (enemy.type === "boss") {
+            enemy.group.rotation.y = Math.atan2(dirX, dirZ);
+          } else {
+            const headingOffset = enemy.type === "nozzle" ? Math.PI : Math.PI / 2;
+            enemy.group.rotation.y = Math.atan2(-dirX, -dirZ) + headingOffset;
+          }
+
+          if (enemy.type === "boss") {
+            updateBoss(enemy, delta, distance, dirX, dirZ);
+            continue;
+          }
 
           if (enemy.type === "nozzle") {
             enemy.attackAnimationTimer = Math.max(0, enemy.attackAnimationTimer - delta);
@@ -1471,27 +2014,7 @@
               enemy.projectile = createNosiProjectile(origin, enemy.projectileTarget);
               enemy.attackCooldown = 3.5;
             }
-            if (enemy.projectile) {
-              const flight = enemy.projectile.userData;
-              flight.age += delta;
-              const forwardDistance = flight.velocity.length() * flight.age;
-              const progress = Math.min(1, forwardDistance / flight.travelDistance);
-              const spiralRadius = flight.spiralRadius * Math.pow(Math.sin(Math.PI * progress), 0.55);
-              const spiralAngle = flight.age * flight.spiralRate;
-              enemy.projectile.position.copy(flight.origin)
-                .addScaledVector(flight.direction, forwardDistance)
-                .addScaledVector(flight.spiralRight, Math.cos(spiralAngle) * spiralRadius)
-                .addScaledVector(flight.spiralUp, Math.sin(spiralAngle) * spiralRadius);
-              enemy.projectile.rotateZ(delta * 6);
-              enemy.projectile.userData.animationMixer?.update(delta);
-              const distanceToPlayer = enemy.projectile.position.distanceTo(player.position);
-              const distanceToTarget = enemy.projectile.position.distanceTo(enemy.projectileTarget);
-              if (distanceToPlayer < 1.15) damagePlayer(enemy.attackDamage);
-              if (distanceToPlayer < 1.15 || distanceToTarget < 0.85) {
-                scene.remove(enemy.projectile);
-                enemy.projectile = null;
-              }
-            }
+            updateEnemyProjectile(enemy, delta);
           }
         }
       }
@@ -1500,10 +2023,13 @@
         elapsed += delta;
         spawnTimer -= delta;
         if (enemiesToSpawn > 0 && spawnTimer <= 0) {
-          const type = (stage + enemiesToSpawn) % 4 === 0 ? "nosi" : "nozzle";
-          createEnemy(type);
-          enemiesToSpawn -= 1;
-          spawnTimer = 5;
+          const spawnCount = Math.min(stage, enemiesToSpawn);
+          for (let index = 0; index < spawnCount; index += 1) {
+            const type = (stage + enemiesToSpawn) % 4 === 0 ? "nosi" : "nozzle";
+            createEnemy(type);
+            enemiesToSpawn -= 1;
+          }
+          spawnTimer += 3;
         }
         updatePlayer(delta);
         updateEnemies(delta);
@@ -1520,7 +2046,9 @@
       function frame() {
         requestAnimationFrame(frame);
         const delta = Math.min(clock.getDelta(), 0.04);
+        updateBossCountdown(delta);
         if (state === "playing") updateGame(delta);
+        updateExplosionEffects(delta);
         if (merchant.visible) {
           merchantBob += delta;
           merchant.position.y = Math.sin(merchantBob * 2.1) * 0.13;
@@ -1544,8 +2072,19 @@
       }
 
       $("#start-button").addEventListener("click", startRun);
+      $("#boss-start-button").addEventListener("click", () => startRun(true));
       $("#next-stage-button").addEventListener("click", () => startStage());
       $("#skip-shop-button").addEventListener("click", () => startStage());
+      $("#boss-shortcut-button").addEventListener("click", () => {
+        stage = 4;
+        startStage();
+      });
+      $("#healing-spring-button").addEventListener("click", () => {
+        if (state !== "shop" || currency < 3 || player.health >= player.maxHealth) return;
+        currency -= 3;
+        player.health = Math.min(player.maxHealth, player.health + 40);
+        updateHud();
+      });
       $("#retry-button").addEventListener("click", startRun);
       $("#quit-button").addEventListener("click", () => {
         state = "intro";
@@ -1559,12 +2098,13 @@
         tryLockPointer();
       });
 
-      const prices = { blade: 3, vitality: 4, weaken: 3, fracture: 4 };
       document.querySelectorAll("[data-upgrade]").forEach((button) => {
         button.addEventListener("click", () => {
           const upgrade = button.dataset.upgrade;
-          if (currency < prices[upgrade]) return;
-          currency -= prices[upgrade];
+          const option = upgradeOptions[upgrade];
+          if (currency < option.cost || upgradeLevels[upgrade] >= option.max) return;
+          currency -= option.cost;
+          upgradeLevels[upgrade] += 1;
           if (upgrade === "blade") player.damageScale *= 1.25;
           if (upgrade === "vitality") {
             player.maxHealth += 10;
@@ -1572,8 +2112,9 @@
           }
           if (upgrade === "weaken") { enemySpeedScale *= 0.85; enemyDamageScale *= 0.85; }
           if (upgrade === "fracture") enemyHealthScale *= 0.8;
-          button.disabled = true;
-          button.querySelector("small").textContent = "구매 완료";
+          if (upgrade === "hurricaneCount") player.hurricaneCount += 1;
+          if (upgrade === "hurricaneDamage") player.hurricaneDamageScale *= 1.25;
+          if (upgrade === "hurricaneCooldown") player.hurricaneCooldownScale *= 0.85;
           updateHud();
         });
       });
