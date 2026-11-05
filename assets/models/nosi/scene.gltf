@@ -1,0 +1,316 @@
+{
+    "accessors":  [
+                      {
+                          "bufferView":  2,
+                          "componentType":  5126,
+                          "count":  32557,
+                          "max":  [
+                                      0.2051500529050827,
+                                      0.31962597370147705,
+                                      0.46247169375419617
+                                  ],
+                          "min":  [
+                                      -0.21938855946063995,
+                                      -0.32170963287353516,
+                                      -0.46921688318252563
+                                  ],
+                          "type":  "VEC3"
+                      },
+                      {
+                          "bufferView":  2,
+                          "byteOffset":  390684,
+                          "componentType":  5126,
+                          "count":  32557,
+                          "max":  [
+                                      0.9999112486839294,
+                                      0.9999359250068665,
+                                      0.9995933175086975
+                                  ],
+                          "min":  [
+                                      -0.9999762177467346,
+                                      -0.9998619556427002,
+                                      -0.9990731477737427
+                                  ],
+                          "type":  "VEC3"
+                      },
+                      {
+                          "bufferView":  3,
+                          "componentType":  5126,
+                          "count":  32557,
+                          "max":  [
+                                      0.9999978542327881,
+                                      0.9999885559082031,
+                                      0.9993920922279358,
+                                      1.0
+                                  ],
+                          "min":  [
+                                      -0.9999903440475464,
+                                      -0.999983549118042,
+                                      -0.9998283982276917,
+                                      -1.0
+                                  ],
+                          "type":  "VEC4"
+                      },
+                      {
+                          "bufferView":  1,
+                          "componentType":  5126,
+                          "count":  32557,
+                          "max":  [
+                                      0.9968346953392029,
+                                      0.9981185793876648
+                                  ],
+                          "min":  [
+                                      0.001881444826722145,
+                                      0.0018814041977748275
+                                  ],
+                          "type":  "VEC2"
+                      },
+                      {
+                          "bufferView":  1,
+                          "byteOffset":  260456,
+                          "componentType":  5126,
+                          "count":  32557,
+                          "max":  [
+                                      0.9968346953392029,
+                                      0.9981185793876648
+                                  ],
+                          "min":  [
+                                      0.001881444826722145,
+                                      0.0018814041977748275
+                                  ],
+                          "type":  "VEC2"
+                      },
+                      {
+                          "bufferView":  1,
+                          "byteOffset":  520912,
+                          "componentType":  5126,
+                          "count":  32557,
+                          "max":  [
+                                      0.9968346953392029,
+                                      0.9981185793876648
+                                  ],
+                          "min":  [
+                                      0.001881444826722145,
+                                      0.0018814041977748275
+                                  ],
+                          "type":  "VEC2"
+                      },
+                      {
+                          "bufferView":  0,
+                          "componentType":  5125,
+                          "count":  107553,
+                          "type":  "SCALAR"
+                      }
+                  ],
+    "asset":  {
+                  "extras":  {
+                                 "author":  "tekovsky (https://sketchfab.com/tekovsky)",
+                                 "license":  "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+                                 "source":  "https://sketchfab.com/3d-models/creature-cb384a11899d4466a636e7bb4a70edd2",
+                                 "title":  "Creature"
+                             },
+                  "generator":  "Sketchfab-16.54.0",
+                  "version":  "2.0"
+              },
+    "bufferViews":  [
+                        {
+                            "buffer":  0,
+                            "byteLength":  430212,
+                            "name":  "floatBufferViews",
+                            "target":  34963
+                        },
+                        {
+                            "buffer":  0,
+                            "byteLength":  781368,
+                            "byteOffset":  430212,
+                            "byteStride":  8,
+                            "name":  "floatBufferViews",
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteLength":  781368,
+                            "byteOffset":  1211580,
+                            "byteStride":  12,
+                            "name":  "floatBufferViews",
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteLength":  520912,
+                            "byteOffset":  1992948,
+                            "byteStride":  16,
+                            "name":  "floatBufferViews",
+                            "target":  34962
+                        }
+                    ],
+    "buffers":  [
+                    {
+                        "byteLength":  2513860,
+                        "uri":  "scene.bin"
+                    }
+                ],
+    "images":  [
+                   {
+                       "uri":  "../../textures/nosi/tripo_mat_b5e5aa7e-d3c9-418d-9550-b8b13fa27222_baseColor.png"
+                   },
+                   {
+                       "uri":  "../../textures/nosi/tripo_mat_b5e5aa7e-d3c9-418d-9550-b8b13fa27222_metallicRoughness.png"
+                   },
+                   {
+                       "uri":  "../../textures/nosi/tripo_mat_b5e5aa7e-d3c9-418d-9550-b8b13fa27222_normal.png"
+                   }
+               ],
+    "materials":  [
+                      {
+                          "doubleSided":  true,
+                          "name":  "tripo_mat_b5e5aa7e-d3c9-418d-9550-b8b13fa27222",
+                          "normalTexture":  {
+                                                "index":  2
+                                            },
+                          "pbrMetallicRoughness":  {
+                                                       "baseColorTexture":  {
+                                                                                "index":  0
+                                                                            },
+                                                       "metallicRoughnessTexture":  {
+                                                                                        "index":  1
+                                                                                    }
+                                                   }
+                      }
+                  ],
+    "meshes":  [
+                   {
+                       "name":  "tripo_node_b5e5aa7e-d3c9-418d-9550-b8b13fa27222_tripo_mat_b5e5aa7e-d3c9-418d-9550-b8b13fa27222_0",
+                       "primitives":  [
+                                          {
+                                              "attributes":  {
+                                                                 "NORMAL":  1,
+                                                                 "POSITION":  0,
+                                                                 "TANGENT":  2,
+                                                                 "TEXCOORD_0":  3,
+                                                                 "TEXCOORD_1":  4,
+                                                                 "TEXCOORD_2":  5
+                                                             },
+                                              "indices":  6,
+                                              "material":  0,
+                                              "mode":  4
+                                          }
+                                      ]
+                   }
+               ],
+    "nodes":  [
+                  {
+                      "children":  [
+                                       1
+                                   ],
+                      "matrix":  [
+                                     1.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     2.2204460492503131E-16,
+                                     -1.0,
+                                     0.0,
+                                     0.0,
+                                     1.0,
+                                     2.2204460492503131E-16,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     1.0
+                                 ],
+                      "name":  "Sketchfab_model"
+                  },
+                  {
+                      "children":  [
+                                       2
+                                   ],
+                      "matrix":  [
+                                     0.009999999776482582,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.009999999776482582,
+                                     0.0,
+                                     0.0,
+                                     -0.009999999776482582,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     1.0
+                                 ],
+                      "name":  "b0a975a9b01849dc85db98a557b91a16.fbx"
+                  },
+                  {
+                      "children":  [
+                                       3
+                                   ],
+                      "name":  "RootNode"
+                  },
+                  {
+                      "children":  [
+                                       4
+                                   ],
+                      "matrix":  [
+                                     100.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     -4.3711390063094768E-06,
+                                     -99.9999999999999,
+                                     0.0,
+                                     0.0,
+                                     99.9999999999999,
+                                     -4.3711390063094768E-06,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     0.0,
+                                     1.0
+                                 ],
+                      "name":  "tripo_node_b5e5aa7e-d3c9-418d-9550-b8b13fa27222"
+                  },
+                  {
+                      "mesh":  0,
+                      "name":  "tripo_node_b5e5aa7e-d3c9-418d-9550-b8b13fa27222_tripo_mat_b5e5aa7e-d3c9-418d-9550-b8b13fa27222_0"
+                  }
+              ],
+    "samplers":  [
+                     {
+                         "magFilter":  9729,
+                         "minFilter":  9987,
+                         "wrapS":  10497,
+                         "wrapT":  10497
+                     }
+                 ],
+    "scene":  0,
+    "scenes":  [
+                   {
+                       "name":  "Sketchfab_Scene",
+                       "nodes":  [
+                                     0
+                                 ]
+                   }
+               ],
+    "textures":  [
+                     {
+                         "sampler":  0,
+                         "source":  0
+                     },
+                     {
+                         "sampler":  0,
+                         "source":  1
+                     },
+                     {
+                         "sampler":  0,
+                         "source":  2
+                     }
+                 ]
+}

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Fire tornado
+* source:	https://sketchfab.com/3d-models/fire-tornado-b22f1181514946c18fc07980c2d2b63a
+* author:	OPREXT (https://sketchfab.com/OPREXT)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Fire tornado" (https://sketchfab.com/3d-models/fire-tornado-b22f1181514946c18fc07980c2d2b63a) by OPREXT (https://sketchfab.com/OPREXT) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

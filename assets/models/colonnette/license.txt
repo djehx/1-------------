@@ -1,0 +1,11 @@
+Model Information:
+* title:	Colonnette
+* source:	https://sketchfab.com/3d-models/colonnette-5e94abb041a644c2b0b8e541026a3f3c
+* author:	Global Digital Heritage and GDH-Afrika (https://sketchfab.com/GlobalDigitalHeritage)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Colonnette" (https://sketchfab.com/3d-models/colonnette-5e94abb041a644c2b0b8e541026a3f3c) by Global Digital Heritage and GDH-Afrika (https://sketchfab.com/GlobalDigitalHeritage) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
