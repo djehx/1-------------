@@ -51,6 +51,18 @@
     .hit-flash.is-active { animation: damage-flash 360ms ease-out; }
     @keyframes damage-flash { from { opacity: 1; } to { opacity: 0; } }
 
+    .heal-flash {
+      position: fixed;
+      z-index: 3;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(ellipse at center, transparent 26%, rgb(112 255 166 / 34%) 100%);
+    }
+
+    .heal-flash.is-active { animation: heal-flash 720ms ease-out; }
+    @keyframes heal-flash { from { opacity: 1; } to { opacity: 0; } }
+
     .boss-countdown {
       position: fixed;
       z-index: 4;
@@ -121,6 +133,8 @@
     .stat-row > div { display: grid; gap: 4px; }
     .stat-value { color: #f3f0e7; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .stat-value--score { color: #e5be72; }
+    .heal-charge { display: flex; justify-content: space-between; margin-top: 10px; color: #b6c4b8; font-size: 11px; }
+    .heal-charge strong { color: #9af0b2; font-variant-numeric: tabular-nums; }
 
     .target-box {
       position: absolute;
@@ -195,6 +209,28 @@
       transform: translateX(-50%);
     }
 
+    .debug-panel {
+      position: fixed;
+      z-index: 4;
+      top: 118px;
+      right: 24px;
+      display: grid;
+      gap: 8px;
+      width: min(280px, calc(100vw - 48px));
+      padding: 12px 14px;
+      border: 1px solid rgb(128 225 164 / 58%);
+      background: rgb(8 20 15 / 88%);
+      color: #e4f5e9;
+      font: 12px/1.5 Consolas, monospace;
+      text-align: left;
+    }
+
+    .debug-panel[hidden] { display: none; }
+    .debug-panel__title { color: #80e1a4; font-weight: 800; }
+    .debug-panel dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 8px; margin: 0; }
+    .debug-panel dt { color: #9fb6a6; }
+    .debug-panel dd { min-width: 0; margin: 0; overflow-wrap: anywhere; text-align: right; }
+
     kbd {
       padding: 2px 5px;
       border: 1px solid #68766a;
@@ -262,6 +298,11 @@
     .action-button--quiet { border-color: #68766a; background: transparent; color: #e2e6dc; }
     .action-button--quiet:hover { background: #28312b; }
     .button-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 23px; }
+    .challenge-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
+    .stage-challenge { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; grid-column: 1 / -1; }
+    .stage-challenge label { grid-column: 1 / -1; color: #d3b36e; font-size: 12px; font-weight: 800; }
+    .stage-challenge select { min-height: 46px; padding: 8px 12px; border: 1px solid #68766a; border-radius: 2px; background: #202923; color: #f3f0e7; font: inherit; }
+    .challenge-actions .action-button { width: 100%; }
 
     .shop-topline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
     .currency { color: #e5be72; font-size: 14px; font-weight: 700; }
@@ -301,6 +342,9 @@
       .shop-grid { grid-template-columns: 1fr; max-height: 38vh; overflow: auto; }
       .shop-choice { min-height: 92px; }
       .key-list { gap: 8px; }
+      .challenge-actions { grid-template-columns: 1fr; }
+      .stage-challenge { grid-template-columns: 1fr; }
+      .debug-panel { top: 116px; right: 12px; width: min(250px, calc(100vw - 24px)); }
     }
 
     @media (max-width: 390px) {
@@ -316,8 +360,9 @@
     <div id="game-mount" aria-label="3D 콜로세움 게임 화면"></div>
     <div class="vignette"></div>
     <div class="hit-flash" id="hit-flash" aria-hidden="true"></div>
+    <div class="heal-flash" id="heal-flash" aria-hidden="true"></div>
     <div class="boss-countdown" id="boss-countdown" role="status" aria-live="assertive" hidden>
-      <span class="boss-countdown__title">BOSS · 더미 등장</span>
+      <span class="boss-countdown__title">BOSS · 드라코 등장</span>
       <strong class="boss-countdown__number" id="boss-countdown-number">3</strong>
     </div>
 
@@ -331,6 +376,7 @@
           <div><span class="stat-label">남은 적</span><strong class="stat-value" id="remaining-value">10</strong></div>
           <div><span class="stat-label">재화</span><strong class="stat-value" id="currency-value">0</strong></div>
         </div>
+        <div class="heal-charge"><span><kbd>Q</kbd> 체력 30 회복</span><strong><span id="heal-charges">2</span> / 2</strong></div>
       </div>
 
       <div class="target-box hud-panel" id="target-box" aria-live="polite">
@@ -348,24 +394,46 @@
       <div class="controls-hint hud-panel">
         <kbd>W</kbd> 앞으로 · <kbd>A</kbd> 왼쪽 · <kbd>S</kbd> 뒤로 · <kbd>D</kbd> 오른쪽 · 마우스 조준 · 좌클릭 검격 · 우클릭 허리케인 발사 · <kbd>SHIFT</kbd> 돌진 · <kbd>SPACE</kbd> 2단 점프
       </div>
+      <aside class="debug-panel" id="debug-panel" aria-label="디버그 정보" aria-live="polite" hidden>
+        <div class="debug-panel__title">DEBUG · T 키로 전환</div>
+        <dl>
+          <dt>플레이어 좌표</dt><dd id="debug-position">0.00, 0.00, 0.00</dd>
+          <dt>적 개수</dt><dd id="debug-enemies">0 / 0</dd>
+          <dt>상태</dt><dd id="debug-state">intro</dd>
+          <dt>점수</dt><dd id="debug-score">0</dd>
+        </dl>
+      </aside>
     </section>
 
     <section class="screen" id="screen" aria-live="polite">
       <div class="panel" id="intro-panel">
         <div class="eyebrow">ARENA SURVIVAL · FIRST PERSON</div>
         <h1>3D 회피 서바이버</h1>
-        <p class="panel-copy">몰려오는 적을 피하고 포인트를 모아 스테이지에서 탈출하세요. 스테이지가 오를수록 더 많은 적이 한꺼번에 등장하며, 마지막 스테이지에서는 보스 더미와 싸웁니다.</p>
+        <p class="panel-copy">몰려오는 적을 피하고 포인트를 모아 스테이지에서 탈출하세요. 스테이지가 오를수록 더 많은 적이 한꺼번에 등장하며, 마지막 스테이지에서는 보스 드라코와 싸웁니다.</p>
         <div class="key-list">
           <div><kbd>WASD</kbd><span>이동과 회피</span></div>
           <div><kbd>MOUSE</kbd><span>시야 조준</span></div>
-          <div><kbd>LEFT CLICK</kbd><span>빠른 검격</span></div>
+          <div><kbd>LEFT CLICK</kbd><span>2연속 검기</span></div>
           <div><kbd>RIGHT CLICK</kbd><span>허리케인 직선 발사</span></div>
           <div><kbd>SHIFT</kbd><span>방향 돌진</span></div>
           <div><kbd>SPACE</kbd><span>점프, 공중에서 2단 점프</span></div>
           <div><kbd>ESC</kbd><span>일시 정지</span></div>
         </div>
-        <button class="action-button" id="start-button" type="button">아레나 입장</button>
-        <button class="action-button action-button--quiet" id="boss-start-button" type="button">보스전 바로 시작</button>
+        <div class="challenge-actions">
+          <div class="stage-challenge">
+            <label for="stage-select">도전 스테이지</label>
+            <select id="stage-select" aria-label="도전할 스테이지">
+              <option value="1">스테이지 1</option>
+              <option value="2">스테이지 2</option>
+              <option value="3">스테이지 3</option>
+              <option value="4">스테이지 4</option>
+              <option value="5">스테이지 5 · 드라코</option>
+            </select>
+            <button class="action-button" id="start-button" type="button">선택 스테이지 도전</button>
+          </div>
+          <button class="action-button action-button--quiet" id="dummy-start-button" type="button" disabled>더미 보스 바로 도전</button>
+          <button class="action-button action-button--quiet" id="boss-start-button" type="button">드라코 바로 도전</button>
+        </div>
       </div>
 
       <div class="panel panel--wide" id="shop-panel" hidden>
@@ -420,13 +488,23 @@
       const mount = $("#game-mount");
       const errorNote = $("#error-note");
       const startButton = $("#start-button");
+      const dummyStartButton = $("#dummy-start-button");
       const bossStartButton = $("#boss-start-button");
+      const stageSelect = $("#stage-select");
       const bossCountdown = $("#boss-countdown");
       const bossCountdownNumber = $("#boss-countdown-number");
+      const bossCountdownTitle = $(".boss-countdown__title");
       startButton.disabled = true;
       startButton.textContent = "드래곤 불러오는 중...";
       bossStartButton.disabled = true;
-      bossStartButton.textContent = "보스 불러오는 중...";
+      bossStartButton.textContent = "드라코 불러오는 중...";
+      dummyStartButton.textContent = "더미 불러오는 중...";
+
+      function updateStageChallengeButton() {
+        const needsDraco = Number(stageSelect.value) === 5;
+        startButton.disabled = !dragonTemplate || (needsDraco && !dracoTemplate);
+        startButton.textContent = needsDraco && !dracoTemplate ? "드라코 불러오는 중..." : "선택 스테이지 도전";
+      }
 
       let renderer;
       try {
@@ -454,8 +532,7 @@
       dragonLoader.load("assets/models/dragon_oga.gltf", (gltf) => {
         dragonTemplate = gltf.scene;
         dragonAnimations = gltf.animations;
-        startButton.disabled = false;
-        startButton.textContent = "아레나 입장";
+        updateStageChallengeButton();
       }, undefined, (error) => {
         console.error("노즐 GLTF 모델을 불러오지 못했습니다.", error);
         $("#error-note p").textContent = "노즐 GLTF 모델을 불러오지 못했습니다. 로컬 웹 서버에서 페이지를 실행해 주세요.";
@@ -483,18 +560,33 @@
         console.error("노시 투사체 모델을 불러오지 못했습니다.", error);
       });
 
-      let mountainDragonTemplate = null;
-      let mountainDragonAnimations = [];
-      const mountainDragonLoader = new GLTFLoader();
-      mountainDragonLoader.load("assets/models/mountain_dragon/scene.gltf", (gltf) => {
-        mountainDragonTemplate = gltf.scene;
-        mountainDragonAnimations = gltf.animations;
+      let dracoTemplate = null;
+      let dracoAnimations = [];
+      const dracoLoader = new GLTFLoader();
+      dracoLoader.load("assets/models/draco/Dragon.glb", (gltf) => {
+        dracoTemplate = gltf.scene;
+        dracoAnimations = gltf.animations;
         bossStartButton.disabled = false;
-        bossStartButton.textContent = "보스전 바로 시작";
+        bossStartButton.textContent = "드라코 바로 도전";
+        updateStageChallengeButton();
+      }, undefined, (error) => {
+        console.error("드라코 모델을 불러오지 못했습니다.", error);
+        bossStartButton.disabled = false;
+        bossStartButton.textContent = "드라코 바로 도전";
+      });
+
+      let dummyTemplate = null;
+      let dummyAnimations = [];
+      const dummyLoader = new GLTFLoader();
+      dummyLoader.load("assets/models/mountain_dragon/scene.gltf", (gltf) => {
+        dummyTemplate = gltf.scene;
+        dummyAnimations = gltf.animations;
+        dummyStartButton.disabled = false;
+        dummyStartButton.textContent = "더미 보스 바로 도전";
       }, undefined, (error) => {
         console.error("더미 보스 모델을 불러오지 못했습니다.", error);
-        bossStartButton.disabled = false;
-        bossStartButton.textContent = "보스전 바로 시작";
+        dummyStartButton.disabled = false;
+        dummyStartButton.textContent = "더미 보스 바로 도전";
       });
 
       let explosionVfxTemplate = null;
@@ -504,7 +596,45 @@
         explosionVfxTemplate = gltf.scene;
         explosionVfxAnimations = gltf.animations;
       }, undefined, (error) => {
-        console.error("더미 필살기 폭발 VFX를 불러오지 못했습니다.", error);
+        console.error("드라코 필살기 보조 VFX를 불러오지 못했습니다.", error);
+      });
+
+      let dracoProjectileTemplate = null;
+      let dracoProjectileAnimations = [];
+      const dracoProjectileLoader = new GLTFLoader();
+      dracoProjectileLoader.load("assets/textures/smoke_effect_test.glb", (gltf) => {
+        dracoProjectileTemplate = gltf.scene;
+        dracoProjectileAnimations = gltf.animations;
+      }, undefined, (error) => {
+        console.error("드라코 평타 모델을 불러오지 못했습니다.", error);
+      });
+
+      let dracoImpactTemplate = null;
+      let dracoImpactAnimations = [];
+      const dracoImpactLoader = new GLTFLoader();
+      dracoImpactLoader.load("assets/textures/폭발.glb", (gltf) => {
+        dracoImpactTemplate = gltf.scene;
+        dracoImpactAnimations = gltf.animations;
+      }, undefined, (error) => {
+        console.error("드라코 평타 폭발 효과를 불러오지 못했습니다.", error);
+      });
+
+      let dracoUltimateTemplate = null;
+      let dracoUltimateAnimations = [];
+      const dracoUltimateLoader = new GLTFLoader();
+      dracoUltimateLoader.load("assets/textures/blazing_star.glb", (gltf) => {
+        dracoUltimateTemplate = gltf.scene;
+        dracoUltimateAnimations = gltf.animations;
+      }, undefined, (error) => {
+        console.error("드라코 필살기 효과를 불러오지 못했습니다.", error);
+      });
+
+      let attackSlashesTemplate = null;
+      const attackSlashesLoader = new GLTFLoader();
+      attackSlashesLoader.load("assets/textures/attack_slashes.glb", (gltf) => {
+        attackSlashesTemplate = gltf.scene;
+      }, undefined, (error) => {
+        console.error("검기 에셋을 불러오지 못했습니다.", error);
       });
 
       let clockLoopTemplate = null;
@@ -762,6 +892,7 @@
         velocityY: 0,
         health: 100,
         maxHealth: 100,
+        healCharges: 2,
         jumpsLeft: 2,
         speed: 8.2,
         damage: 48,
@@ -883,7 +1014,9 @@
       const keys = new Set();
       const enemies = [];
       const slashProjectiles = [];
+      const healFlash = $("#heal-flash");
       const explosionEffects = [];
+      let dracoSafeDome = null;
       const raycaster = new THREE.Raycaster();
       raycaster.far = 30;
       const center = new THREE.Vector2(0, 0);
@@ -891,9 +1024,13 @@
       const enemyMeshes = [];
       let yaw = 0;
       let pitch = 0;
+      let lightComboStep = 0;
+      let lightComboTimer = 0;
+      let showDebug = false;
       let state = "intro";
       let pointerLockWasActive = false;
       let stage = 1;
+      let runBossModel = "draco";
       let bossCountdownTimer = 0;
       let bossCountdownDisplayed = 0;
       let score = 0;
@@ -926,6 +1063,9 @@
         targetBox: $("#target-box"), targetName: $("#target-name"), targetHealth: $("#target-health"),
         targetFill: $("#target-fill"), shopCurrency: $("#shop-currency"),
         healingSpring: $("#healing-spring-button"),
+        healCharges: $("#heal-charges"),
+        debugPanel: $("#debug-panel"), debugPosition: $("#debug-position"),
+        debugEnemies: $("#debug-enemies"), debugState: $("#debug-state"), debugScore: $("#debug-score"),
       };
 
       function setPanel(panelSelector) {
@@ -939,6 +1079,8 @@
         dom.healthFill.style.width = `${Math.max(0, (player.health / player.maxHealth) * 100)}%`;
         dom.healthFill.style.backgroundColor = player.health < player.maxHealth * 0.3 ? "#df765c" : "#d7e27a";
         dom.healthMeter.setAttribute("aria-valuenow", String(Math.ceil(player.health)));
+        dom.healthMeter.setAttribute("aria-valuemax", String(player.maxHealth));
+        dom.healCharges.textContent = player.healCharges;
         dom.score.textContent = score;
         dom.remaining.textContent = Math.max(0, enemiesToSpawn + enemies.length);
         dom.currency.textContent = currency;
@@ -955,6 +1097,15 @@
             : `비용 ${option.cost} · ${level}/${option.max}`;
         });
         dom.healingSpring.disabled = currency < 3 || player.health >= player.maxHealth;
+      }
+
+      function updateDebugPanel() {
+        if (!showDebug) return;
+        dom.debugPosition.textContent = `${player.position.x.toFixed(2)}, ${player.position.y.toFixed(2)}, ${player.position.z.toFixed(2)}`;
+        dom.debugEnemies.textContent = `${enemies.length} alive / ${remainingCount()} remaining`;
+        const boss = enemies.find((enemy) => enemy.type === "boss");
+        dom.debugState.textContent = `${state}${boss ? ` / ${boss.bossModel}:${boss.bossState}` : ""}${player.timeStopTimer > 0 ? " / time-stop" : ""}`;
+        dom.debugScore.textContent = String(score);
       }
 
       function addMesh(group, geometry, material, position, scale) {
@@ -1016,6 +1167,14 @@
         enemy.currentAction = action;
       }
 
+      function setDracoAnimation(enemy, animationName) {
+        const action = enemy.actions.get(animationName);
+        if (!action || enemy.currentAction === action) return;
+        enemy.currentAction?.fadeOut(0.2);
+        action.reset().fadeIn(0.2).play();
+        enemy.currentAction = action;
+      }
+
       function makeNozzle(enemy) {
         const group = new THREE.Group();
         const model = cloneSkinnedModel(dragonTemplate);
@@ -1050,6 +1209,8 @@
         enemy.attackRange = 2.15;
         enemy.attackDamage = 9;
         enemy.speed = 2.7 + stage * 0.16;
+        enemy.dashCooldown = stage >= 3 ? 8 + Math.random() * 4 : Infinity;
+        enemy.chargeState = null;
         setNozzleAnimation(enemy, "Idle");
       }
 
@@ -1087,10 +1248,10 @@
         enemy.attackCooldown = 1.8;
       }
 
-      function makeDummyBoss(enemy) {
+      function makeDracoBoss(enemy) {
         const group = new THREE.Group();
-        if (mountainDragonTemplate) {
-          const model = cloneSkinnedModel(mountainDragonTemplate);
+        if (dracoTemplate) {
+          const model = cloneSkinnedModel(dracoTemplate);
           model.traverse((object) => {
             if (object.isMesh) {
               object.castShadow = true;
@@ -1102,16 +1263,14 @@
           const bounds = new THREE.Box3().setFromObject(model);
           const size = bounds.getSize(new THREE.Vector3());
           const center = bounds.getCenter(new THREE.Vector3());
-          const scale = 12 / Math.max(size.x, size.y, size.z, 0.001);
+          const scale = 18 / Math.max(size.x, size.y, size.z, 0.001);
           model.scale.setScalar(scale);
           model.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
           group.add(model);
           enemy.model = model;
           enemy.mixer = new THREE.AnimationMixer(model);
-          enemy.actions = mountainDragonAnimations.map((clip) => enemy.mixer.clipAction(clip));
-          enemy.actions.forEach((action) => action.play());
-          enemy.modelRoot = model.getObjectByName("root_01_8");
-          enemy.modelRootRotation = enemy.modelRoot?.quaternion.clone();
+          enemy.actions = new Map(dracoAnimations.map((clip) => [clip.name.toLowerCase(), enemy.mixer.clipAction(clip)]));
+          setDracoAnimation(enemy, "idle");
         } else {
           const body = addMesh(group, new THREE.SphereGeometry(3.4, 18, 14), new THREE.MeshStandardMaterial({ color: 0x66504a, roughness: 0.68 }), [0, 3.4, 0]);
           body.scale.set(1.35, 1, 1.8);
@@ -1119,6 +1278,47 @@
             const wing = addMesh(group, new THREE.ConeGeometry(2.2, 5, 6), new THREE.MeshStandardMaterial({ color: 0x453b3d, side: THREE.DoubleSide }), [side * 3.2, 4.2, 0], [1, 1, 0.28]);
             wing.rotation.z = side * -0.5;
           }
+        }
+        enemy.group = group;
+        enemy.attackRange = 7.5;
+        enemy.attackDamage = 26;
+        enemy.speed = 2.35;
+        enemy.attackCooldown = 2.8;
+        enemy.ultimateCooldown = 1.2;
+        enemy.chargeCooldown = 7;
+        enemy.timeStopCooldown = 12;
+        enemy.bossState = "ground";
+        enemy.bossStateTimer = 0;
+        enemy.timeStopPhase = null;
+        enemy.timeStopTimer = 0;
+        enemy.enraged = false;
+        enemy.flightHeight = 11;
+        enemy.groundPhaseTimer = 18;
+        enemy.burstRemaining = 0;
+        setupTimeStopClock(enemy);
+      }
+
+      function makeDummyBoss(enemy) {
+        const group = new THREE.Group();
+        if (dummyTemplate) {
+          const model = cloneSkinnedModel(dummyTemplate);
+          model.updateMatrixWorld(true);
+          const bounds = new THREE.Box3().setFromObject(model);
+          const size = bounds.getSize(new THREE.Vector3());
+          const center = bounds.getCenter(new THREE.Vector3());
+          const scale = 12 / Math.max(size.x, size.y, size.z, 0.001);
+          model.scale.setScalar(scale);
+          model.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
+          model.traverse((object) => {
+            if (object.isMesh) object.frustumCulled = false;
+          });
+          group.add(model);
+          enemy.model = model;
+          enemy.mixer = new THREE.AnimationMixer(model);
+          enemy.actions = new Map(dummyAnimations.map((clip) => [clip.name.toLowerCase(), enemy.mixer.clipAction(clip)]));
+          enemy.actions.forEach((action) => action.play());
+        } else {
+          addMesh(group, new THREE.SphereGeometry(3.4, 18, 14), new THREE.MeshStandardMaterial({ color: 0x66504a }), [0, 3.4, 0]);
         }
         enemy.group = group;
         enemy.attackRange = 7.5;
@@ -1133,12 +1333,14 @@
         enemy.timeStopPhase = null;
         enemy.timeStopTimer = 0;
         enemy.enraged = false;
-        enemy.flightHeight = 17;
+        enemy.flightHeight = 11;
+        enemy.groundPhaseTimer = 18;
+        enemy.burstRemaining = 0;
         setupTimeStopClock(enemy);
       }
 
       function setupTimeStopClock(enemy) {
-        if (!clockLoopTemplate || clockLoopAnimations.length === 0 || !enemy.group || enemy.timeStopClock) return;
+        if (enemy.bossModel !== "dummy" || !clockLoopTemplate || clockLoopAnimations.length === 0 || !enemy.group || enemy.timeStopClock) return;
         const frame = new THREE.Group();
         frame.position.set(0, 5.5, -8);
         frame.rotation.x = -Math.PI / 2;
@@ -1161,6 +1363,7 @@
       }
 
       function startTimeStopPattern(enemy) {
+        if (enemy.bossModel !== "dummy") return false;
         setupTimeStopClock(enemy);
         if (!enemy.timeStopClock || !enemy.timeStopAction) {
           console.error("보스 시간 정지 패턴을 시작할 수 없습니다. 시계 에셋이 준비되지 않았습니다.");
@@ -1238,42 +1441,154 @@
         };
       }
 
-      function warnBossUltimate(enemy) {
-        if (!explosionVfxTemplate || explosionVfxAnimations.length === 0) {
-          console.error("더미 필살기를 시작할 수 없습니다. 필살기 VFX가 아직 준비되지 않았습니다.");
-          enemy.ultimateCooldown = 2;
-          return false;
+      function createDracoSkyRifts() {
+        if (!dracoUltimateTemplate) return null;
+        const group = new THREE.Group();
+        const model = cloneSkinnedModel(dracoUltimateTemplate);
+        model.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(model);
+        const size = bounds.getSize(new THREE.Vector3());
+        const center = bounds.getCenter(new THREE.Vector3());
+        const baseScale = 1 / Math.max(size.x, size.y, size.z, 0.001);
+        model.scale.setScalar(baseScale);
+        model.position.set(-center.x * baseScale, -center.y * baseScale, -center.z * baseScale);
+        const materials = [];
+        model.traverse((object) => {
+          if (!object.isMesh) return;
+          object.frustumCulled = false;
+          object.material = Array.isArray(object.material)
+            ? object.material.map((material) => material.clone())
+            : object.material.clone();
+          const meshMaterials = Array.isArray(object.material) ? object.material : [object.material];
+          meshMaterials.forEach((material) => {
+            material.transparent = true;
+            material.blending = THREE.AdditiveBlending;
+            material.opacity = 0.72;
+            material.depthWrite = false;
+            material.color.lerp(new THREE.Color(0xc69aff), 0.35);
+            if ("emissiveIntensity" in material) material.emissiveIntensity = Math.max(material.emissiveIntensity, 2.4);
+            material.userData.baseOpacity = material.opacity;
+            materials.push(material);
+          });
+        });
+        group.add(model);
+        group.position.set(0, 32, 0);
+        group.scale.setScalar(0.08);
+        scene.add(group);
+        const mixer = new THREE.AnimationMixer(model);
+        dracoUltimateAnimations.forEach((clip) => mixer.clipAction(clip).play());
+        return { group, model, materials, mixer, age: 0, growDuration: 3.2 };
+      }
+
+      function updateDracoSkyRifts(enemy, delta) {
+        const effect = enemy.skyRifts;
+        if (!effect) return;
+        effect.age += delta;
+        const progress = THREE.MathUtils.smoothstep(effect.age / effect.growDuration, 0, 1);
+        const skyCoverage = THREE.MathUtils.lerp(0.08, 90, progress);
+        effect.group.scale.set(skyCoverage, THREE.MathUtils.lerp(0.08, 50, progress), skyCoverage);
+        effect.group.rotation.y += delta * 0.08;
+        effect.mixer.update(delta);
+        effect.materials.forEach((material) => {
+          material.opacity = (material.userData.baseOpacity ?? 1) * (0.7 + progress * 0.3);
+        });
+      }
+
+      function removeDracoSkyRifts(enemy) {
+        if (!enemy.skyRifts) return;
+        scene.remove(enemy.skyRifts.group);
+        enemy.skyRifts.mixer.stopAllAction();
+        enemy.skyRifts.materials.forEach((material) => material.dispose());
+        enemy.skyRifts = null;
+      }
+
+      function createDracoSafeDome() {
+        removeDracoSafeDome();
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 9;
+        const center = new THREE.Vector3(Math.cos(angle) * 15, 0, Math.sin(angle) * 15);
+        const group = new THREE.Group();
+        const dome = new THREE.Mesh(
+          new THREE.SphereGeometry(radius, 36, 20, 0, Math.PI * 2, 0, Math.PI / 2),
+          new THREE.MeshStandardMaterial({
+            color: 0x32ff83,
+            emissive: 0x0b5425,
+            emissiveIntensity: 0.65,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            roughness: 0.25,
+          }),
+        );
+        dome.position.y = 0.08;
+        const boundary = new THREE.Mesh(
+          new THREE.TorusGeometry(radius, 0.18, 8, 64),
+          new THREE.MeshBasicMaterial({ color: 0x6dff9d, transparent: true, opacity: 0.9 }),
+        );
+        boundary.rotation.x = Math.PI / 2;
+        boundary.position.y = 0.12;
+        group.add(dome, boundary);
+        group.position.copy(center);
+        scene.add(group);
+        dracoSafeDome = { group, center, radius, height: radius };
+        return dracoSafeDome;
+      }
+
+      function removeDracoSafeDome() {
+        if (!dracoSafeDome) return;
+        scene.remove(dracoSafeDome.group);
+        dracoSafeDome.group.traverse((object) => {
+          if (!object.isMesh) return;
+          object.geometry.dispose();
+          object.material.dispose();
+        });
+        dracoSafeDome = null;
+      }
+
+      function removeDracoUltimateOrb(enemy) {
+        if (enemy.ultimateOrb) {
+          scene.remove(enemy.ultimateOrb.group);
+          enemy.ultimateOrb.mixer?.stopAllAction();
+          enemy.ultimateOrb = null;
         }
+        removeDracoSkyRifts(enemy);
+        removeDracoSafeDome();
+      }
+
+      function warnBossUltimate(enemy) {
         const point = new THREE.Vector3(
           player.position.x,
           getStairHeight(player.position.x, player.position.z),
           player.position.z,
         );
-        enemy.warning = createExplosionVfx(point);
-        enemy.warning.radius = enemy.enraged ? 13 : 12;
-        enemy.warning.damage = enemy.enraged ? 16 : 12;
-        enemy.warning.damageStart = 5;
-        enemy.warning.damageInterval = 0.65;
-        enemy.warning.nextDamageAt = enemy.warning.damageStart;
-        enemy.additionalUltimateWarnings = [];
-        if (enemy.hp <= enemy.maxHp * 0.5) {
-          const towardPlayer = point.clone().sub(enemy.group.position).setY(0);
-          if (towardPlayer.lengthSq() === 0) towardPlayer.set(1, 0, 0);
-          towardPlayer.normalize();
-          const side = new THREE.Vector3(-towardPlayer.z, 0, towardPlayer.x);
-          const secondPoint = point.clone().addScaledVector(side, 20);
-          if (Math.hypot(secondPoint.x, secondPoint.z) > 31) secondPoint.setLength(31);
-          secondPoint.y = getStairHeight(secondPoint.x, secondPoint.z);
-          const secondWarning = createExplosionVfx(secondPoint);
-          secondWarning.radius = enemy.enraged ? 13 : 12;
-          secondWarning.damage = enemy.enraged ? 16 : 12;
-          secondWarning.damageStart = 5;
-          secondWarning.damageInterval = 0.65;
-          secondWarning.nextDamageAt = secondWarning.damageStart;
-          enemy.additionalUltimateWarnings.push(secondWarning);
+        if (enemy.bossModel === "dummy") {
+          if (!explosionVfxTemplate || explosionVfxAnimations.length === 0) {
+            enemy.ultimateCooldown = 2;
+            return false;
+          }
+          enemy.warning = createExplosionVfx(point);
+          enemy.warning.radius = enemy.enraged ? 13 : 12;
+          enemy.warning.damage = enemy.enraged ? 16 : 12;
+          enemy.warning.damageStart = 5;
+          enemy.warning.damageInterval = 0.65;
+          enemy.warning.nextDamageAt = enemy.warning.damageStart;
+          enemy.bossState = "ultimateRise";
+          enemy.bossStateTimer = enemy.warning.duration;
+          return true;
         }
+        enemy.warning = {
+          point,
+          radius: 41,
+          damage: enemy.enraged ? 22 : 16,
+          duration: 1.3,
+        };
+        enemy.ultimateDamageTimer = 0;
+        enemy.invulnerable = true;
+        enemy.skyRifts = createDracoSkyRifts();
+        createDracoSafeDome();
         enemy.bossState = "ultimateRise";
-        enemy.bossStateTimer = enemy.warning.duration;
+        enemy.bossStateTimer = 1.3;
         return true;
       }
 
@@ -1299,6 +1614,28 @@
         enemy.bossStateTimer = enemy.warning.duration;
         enemy.chargeStart = start.clone();
         enemy.chargeEnd = end.clone();
+      }
+
+      function warnNozzleCharge(enemy) {
+        const start = enemy.group.position.clone();
+        const end = new THREE.Vector3(player.position.x, 0, player.position.z);
+        const direction = end.clone().sub(start).setY(0).normalize();
+        end.copy(start).addScaledVector(direction, Math.min(start.distanceTo(end) + 2, 22));
+        if (Math.hypot(end.x, end.z) > 31) end.setLength(31);
+        const warning = createBossTelegraph(end, 2.4);
+        const lane = new THREE.Mesh(
+          new THREE.BoxGeometry(2.4, 0.035, start.distanceTo(end)),
+          new THREE.MeshBasicMaterial({ color: 0xff8a45, transparent: true, opacity: 0.48, depthWrite: false }),
+        );
+        lane.position.set((start.x + end.x) / 2, 0.02, (start.z + end.z) / 2);
+        lane.rotation.y = Math.atan2(end.x - start.x, end.z - start.z);
+        warning.group.add(lane);
+        enemy.warning = { ...warning, lane };
+        enemy.chargeStart = start;
+        enemy.chargeEnd = end;
+        enemy.chargeTimer = 0.8;
+        enemy.chargeHit = false;
+        enemy.chargeState = "windup";
       }
 
       function damageBossAttack(point, radius, damage, force = false) {
@@ -1346,6 +1683,34 @@
         return effect;
       }
 
+      function createDracoImpactVfx(point) {
+        if (!dracoImpactTemplate) return;
+        const model = cloneSkinnedModel(dracoImpactTemplate);
+        model.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(model);
+        const size = bounds.getSize(new THREE.Vector3());
+        const center = bounds.getCenter(new THREE.Vector3());
+        const scale = 3.8 / Math.max(size.x, size.y, size.z, 0.001);
+        model.scale.setScalar(scale);
+        model.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
+        model.traverse((object) => {
+          if (object.isMesh) object.frustumCulled = false;
+        });
+        const group = new THREE.Group();
+        group.add(model);
+        group.position.copy(point);
+        const mixer = new THREE.AnimationMixer(model);
+        const duration = dracoImpactAnimations[0]?.duration ?? 1.2;
+        if (dracoImpactAnimations[0]) {
+          const action = mixer.clipAction(dracoImpactAnimations[0]);
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+          action.play();
+        }
+        scene.add(group);
+        explosionEffects.push({ group, mixer, age: 0, duration, point: point.clone() });
+      }
+
       function updateExplosionEffects(delta) {
         for (let index = explosionEffects.length - 1; index >= 0; index -= 1) {
           const effect = explosionEffects[index];
@@ -1378,12 +1743,14 @@
         return new THREE.MeshStandardMaterial({ color: 0xe1a15b, emissive: 0x8c361b, emissiveIntensity: 1.5 });
       }
 
-      function createEnemy(type) {
+      function createEnemy(type, bossModel = "draco") {
         const isBoss = type === "boss";
+        const bossHealth = bossModel === "dummy" ? 2500 : 3500;
         const enemy = {
           type,
-          hp: (isBoss ? 2500 : type === "nozzle" ? 96 : 72) * enemyHealthScale,
-          maxHp: (isBoss ? 2500 : type === "nozzle" ? 96 : 72) * enemyHealthScale,
+          bossModel: isBoss ? bossModel : null,
+          hp: (isBoss ? bossHealth : type === "nozzle" ? 96 : 72) * enemyHealthScale,
+          maxHp: (isBoss ? bossHealth : type === "nozzle" ? 96 : 72) * enemyHealthScale,
           attackCooldown: type === "nozzle" ? 0.7 : 1.8 + Math.random() * 1.4,
           age: Math.random() * 3,
           telegraph: 0,
@@ -1392,10 +1759,15 @@
         };
         if (type === "nozzle") makeNozzle(enemy);
         else if (type === "nosi") makeNosi(enemy);
-        else makeDummyBoss(enemy);
-        const angle = Math.random() * Math.PI * 2;
+        else if (bossModel === "dummy") makeDummyBoss(enemy);
+        else makeDracoBoss(enemy);
         const distance = isBoss ? 20 : 14 + Math.random() * 10;
-        enemy.group.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+        if (isBoss) {
+          enemy.group.position.set(-Math.sin(yaw) * distance, 0, -Math.cos(yaw) * distance);
+        } else {
+          const angle = Math.random() * Math.PI * 2;
+          enemy.group.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+        }
         enemy.group.userData.enemy = enemy;
         enemy.group.traverse((object) => {
           if (object.isMesh) enemyMeshes.push(object);
@@ -1410,6 +1782,7 @@
         bossCountdownTimer = 3;
         bossCountdownDisplayed = 3;
         bossCountdownNumber.textContent = "3";
+        bossCountdownTitle.textContent = runBossModel === "dummy" ? "BOSS · 더미 등장" : "BOSS · 드라코 등장";
         bossCountdown.hidden = false;
         state = "boss-intro";
       }
@@ -1429,11 +1802,14 @@
         }
       }
 
-      function startRun(startAtBoss = false) {
+      function startRun(startAtStage = 1, bossModel = "draco") {
         clearSlashProjectiles();
         bossCountdownTimer = 0;
         bossCountdown.hidden = true;
-        stage = startAtBoss ? 5 : 1;
+        stage = THREE.MathUtils.clamp(Math.floor(startAtStage), 1, 5);
+        runBossModel = bossModel;
+        targetEnemy = null;
+        dom.targetBox.classList.remove("is-visible", "is-enraged");
         score = 0;
         currency = 0;
         elapsed = 0;
@@ -1453,13 +1829,16 @@
         player.dashCooldown = 0;
         player.dashTime = 0;
         player.weaponCooldown = 0;
+        lightComboStep = 0;
+        lightComboTimer = 0;
         player.dashReady = true;
         dom.targetBox.classList.remove("is-enraged");
         enemyHealthScale = enemySpeedScale = enemyDamageScale = 1;
         enemiesToSpawn = 0;
         enemies.splice(0).forEach((enemy) => {
           scene.remove(enemy.group);
-          if (enemy.projectile) scene.remove(enemy.projectile);
+          clearEnemyProjectiles(enemy);
+          removeDracoUltimateOrb(enemy);
           removeTimeStopClock(enemy);
           removeBossTelegraph(enemy);
         });
@@ -1475,10 +1854,14 @@
 
       function startStage(firstStage = false) {
         if (!firstStage) stage += 1;
+        player.healCharges = 2;
+        player.invulnerable = 0;
         state = stage === 5 ? "boss-intro" : "playing";
         enemiesToSpawn = stage === 5 ? 1 : 10 * (2 ** (stage - 1));
-        createEnemy(stage === 5 ? "boss" : stage % 3 === 0 ? "nosi" : "nozzle");
+        createEnemy(stage === 5 ? "boss" : stage % 3 === 0 ? "nosi" : "nozzle", runBossModel);
         enemiesToSpawn -= 1;
+        targetUpdate = 0;
+        updateTarget();
         spawnTimer = 3;
         merchant.visible = false;
         setPanel(null);
@@ -1503,10 +1886,8 @@
         state = won ? "won" : "lost";
         clearSlashProjectiles();
         enemies.forEach((enemy) => {
-          if (enemy.projectile) {
-            scene.remove(enemy.projectile);
-            enemy.projectile = null;
-          }
+          clearEnemyProjectiles(enemy);
+          removeDracoUltimateOrb(enemy);
           removeBossTelegraph(enemy);
         });
         if (document.pointerLockElement) document.exitPointerLock();
@@ -1518,10 +1899,17 @@
         setPanel("#end-panel");
       }
 
-      function createNosiProjectile(origin, target) {
+      function createNosiProjectile(
+        origin,
+        target,
+        template = nosiProjectileTemplate,
+        animations = nosiProjectileAnimations,
+        modelSize = 9.6,
+        explosive = false,
+      ) {
         const projectile = new THREE.Group();
-        if (nosiProjectileTemplate) {
-          const model = cloneSkinnedModel(nosiProjectileTemplate);
+        if (template) {
+          const model = cloneSkinnedModel(template);
           model.updateMatrixWorld(true);
           const initialBounds = new THREE.Box3().setFromObject(model);
           const initialSize = initialBounds.getSize(new THREE.Vector3());
@@ -1530,16 +1918,16 @@
           const bounds = new THREE.Box3().setFromObject(model);
           const size = bounds.getSize(new THREE.Vector3());
           const center = bounds.getCenter(new THREE.Vector3());
-          const scale = 9.6 / Math.max(size.x, size.y, size.z, 0.001);
+          const scale = modelSize / Math.max(size.x, size.y, size.z, 0.001);
           model.scale.setScalar(scale);
           model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
           model.traverse((object) => {
             if (object.isMesh) object.frustumCulled = false;
           });
           projectile.add(model);
-          if (nosiProjectileAnimations.length > 0) {
+          if (animations.length > 0) {
             const mixer = new THREE.AnimationMixer(model);
-            nosiProjectileAnimations.forEach((clip) => mixer.clipAction(clip).play());
+            animations.forEach((clip) => mixer.clipAction(clip).play());
             projectile.userData.animationMixer = mixer;
           }
         } else {
@@ -1568,6 +1956,7 @@
           origin: origin.clone(),
           age: 0,
           travelDistance: origin.distanceTo(target),
+          explosive,
         };
         scene.add(projectile);
         return projectile;
@@ -1583,6 +1972,90 @@
         shape.lineTo(width * 0.34, -thickness * 0.34);
         shape.closePath();
         return new THREE.ShapeGeometry(shape);
+      }
+
+      function createAttackSlashModel(size) {
+        if (!attackSlashesTemplate) return null;
+        const model = cloneSkinnedModel(attackSlashesTemplate);
+        const selectedSlash = model.getObjectByName("Circle.003_slash_0");
+        if (!selectedSlash) return null;
+        const requiredNodes = new Set();
+        for (let node = selectedSlash; node; node = node.parent) requiredNodes.add(node);
+        const pruneMeshes = (node) => {
+          [...node.children].forEach((child) => {
+            if (!requiredNodes.has(child)) node.remove(child);
+            else pruneMeshes(child);
+          });
+        };
+        pruneMeshes(model);
+        model.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(model);
+        const modelSize = bounds.getSize(new THREE.Vector3());
+        const center = bounds.getCenter(new THREE.Vector3());
+        const scale = size / Math.max(modelSize.x, modelSize.y, modelSize.z, 0.001);
+        model.scale.setScalar(scale);
+        model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+        const materials = [];
+        model.traverse((object) => {
+          if (!object.isMesh) return;
+          object.frustumCulled = false;
+          object.material = Array.isArray(object.material)
+            ? object.material.map((material) => material.clone())
+            : object.material.clone();
+          const meshMaterials = Array.isArray(object.material) ? object.material : [object.material];
+          meshMaterials.forEach((material) => {
+            material.transparent = true;
+            material.depthWrite = false;
+            material.side = THREE.DoubleSide;
+            material.userData.baseOpacity = material.opacity;
+            if ("emissiveIntensity" in material) material.emissiveIntensity = Math.max(material.emissiveIntensity, 1.35);
+            materials.push(material);
+          });
+        });
+        return { model, materials };
+      }
+
+      function launchMeleeSlash(combo, target = null) {
+        const direction = target
+          ? target.group.position.clone().sub(player.position).normalize()
+          : new THREE.Vector3(
+            -Math.sin(yaw) * Math.cos(pitch),
+            Math.sin(pitch),
+            -Math.cos(yaw) * Math.cos(pitch),
+          ).normalize();
+        const origin = player.position.clone().addScaledVector(direction, 1.3);
+        origin.y += 0.12;
+        const mesh = new THREE.Group();
+        const slashAsset = createAttackSlashModel(5.2);
+        const materials = slashAsset?.materials ?? [];
+        if (slashAsset) {
+          slashAsset.model.scale.y *= 0.44;
+          slashAsset.model.scale.z *= 0.68;
+          mesh.add(slashAsset.model);
+        } else {
+          const material = new THREE.MeshBasicMaterial({ color: 0xb45bfa, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+          const blade = new THREE.Mesh(createSlashBlade(2.4, 0.72), material);
+          mesh.add(blade);
+          materials.push(material);
+        }
+        mesh.position.copy(origin);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+        mesh.rotateZ(combo === 1 ? -Math.PI / 4 : Math.PI / 4);
+        scene.add(mesh);
+        const speed = 18;
+        const maxDistance = 3.2;
+        slashProjectiles.push({
+          mesh,
+          velocity: direction.clone().multiplyScalar(speed),
+          distance: 0,
+          maxDistance,
+          life: maxDistance / speed,
+          meleeEffect: true,
+          hitEnemies: new Set(),
+          materials,
+          sharedModel: true,
+          damage: player.damage * player.damageScale * (combo === 2 ? 1.15 : 0.8),
+        });
       }
 
       function launchSlashProjectile(yawOffset = 0) {
@@ -1664,11 +2137,11 @@
           projectile.distance += step;
           projectile.life -= delta;
           const fade = Math.min(1, projectile.life / 0.18);
-          projectile.materials.forEach((material) => { material.opacity = fade; });
+          projectile.materials.forEach((material) => { material.opacity = (material.userData.baseOpacity ?? 1) * fade; });
 
           [...enemies].forEach((enemy) => {
             if (projectile.hitEnemies.has(enemy)) return;
-            if (enemy.group.position.distanceTo(projectile.mesh.position) < 2.55) {
+            if (enemy.group.position.distanceTo(projectile.mesh.position) < (projectile.hitRadius ?? 2.55)) {
               projectile.hitEnemies.add(enemy);
               damageEnemy(enemy, projectile.damage);
             }
@@ -1696,9 +2169,24 @@
       }
 
       function damagePlayer(amount, ignoreInvulnerability = false) {
-        if ((!ignoreInvulnerability && player.invulnerable > 0) || state !== "playing") return;
-        player.health = Math.max(0, player.health - amount * enemyDamageScale);
-        player.invulnerable = 0.42;
+        if (state !== "playing") return;
+        if (!Number.isFinite(player.health)) {
+          console.error("플레이어 체력이 숫자가 아니어서 전투를 종료합니다.", player.health);
+          player.health = 0;
+          updateHud();
+          showEnd(false);
+          return;
+        }
+        if (dracoSafeDome
+            && Math.hypot(player.position.x - dracoSafeDome.center.x, player.position.z - dracoSafeDome.center.z) <= dracoSafeDome.radius
+            && player.position.y - 1.68 <= dracoSafeDome.height) return;
+        if (!ignoreInvulnerability && player.invulnerable > 0) return;
+        let damage = amount * enemyDamageScale;
+        if (!Number.isFinite(damage) || damage < 0) {
+          console.error(`잘못된 피해값 amount=${String(amount)}, scale=${String(enemyDamageScale)}\n${new Error().stack}`);
+          damage = 1;
+        }
+        player.health = Math.max(0, player.health - damage);
         const hitFlash = $("#hit-flash");
         hitFlash.classList.remove("is-active");
         void hitFlash.offsetWidth;
@@ -1709,41 +2197,128 @@
 
       function updateEnemyProjectile(enemy, delta) {
         if (!enemy.projectile) return;
-        const flight = enemy.projectile.userData;
+        if (advanceEnemyProjectile(enemy, enemy.projectile, delta)) enemy.projectile = null;
+      }
+
+      function advanceEnemyProjectile(enemy, projectile, delta) {
+        const flight = projectile.userData;
+        const projectileDamage = Number.isFinite(flight.damage)
+          ? flight.damage
+          : Number.isFinite(enemy.attackDamage) ? enemy.attackDamage : 14;
         flight.age += delta;
         const travelled = Math.min(flight.travelDistance, flight.velocity.length() * flight.age);
-        enemy.projectile.position.copy(flight.origin).addScaledVector(flight.direction, travelled);
+        projectile.position.copy(flight.origin).addScaledVector(flight.direction, travelled);
         flight.animationMixer?.update(delta);
-        const hitPlayer = enemy.projectile.position.distanceTo(player.position) < 1.15;
-        if (hitPlayer) damagePlayer(enemy.attackDamage);
-        if (hitPlayer || travelled >= flight.travelDistance) {
+        const hitPlayer = projectile.position.distanceTo(player.position) < 1.15;
+        if (hitPlayer) damagePlayer(projectileDamage);
+        const hitWall = Math.hypot(projectile.position.x, projectile.position.z) > 32;
+        if (hitPlayer || hitWall || travelled >= flight.travelDistance) {
+          if (flight.explosive) {
+            const point = projectile.position.clone();
+            point.y = getStairHeight(point.x, point.z) + 0.06;
+            createDracoImpactVfx(point);
+            if (Math.hypot(player.position.x - point.x, player.position.z - point.z) < 4.2) {
+              damagePlayer(projectileDamage * 1.35);
+            }
+          }
+          scene.remove(projectile);
+          return true;
+        }
+        return false;
+      }
+
+      function fireNosiRadial(enemy) {
+        const origin = enemy.group.position.clone().add(new THREE.Vector3(0, 3.4, 0));
+        enemy.radialProjectiles = Array.from({ length: 3 }, (_, index) => {
+          const angle = enemy.age + (index * Math.PI * 2) / 3;
+          const target = origin.clone().add(new THREE.Vector3(Math.cos(angle) * 32, 0, Math.sin(angle) * 32));
+          target.y = player.position.y;
+          const projectile = createNosiProjectile(origin, target);
+          projectile.userData.velocity.setLength(18);
+          projectile.userData.damage = enemy.attackDamage;
+          return projectile;
+        });
+      }
+
+      function updateNosiProjectiles(enemy, delta) {
+        if (!enemy.radialProjectiles) return;
+        for (let index = enemy.radialProjectiles.length - 1; index >= 0; index -= 1) {
+          if (advanceEnemyProjectile(enemy, enemy.radialProjectiles[index], delta)) {
+            enemy.radialProjectiles.splice(index, 1);
+          }
+        }
+      }
+
+      function clearEnemyProjectiles(enemy) {
+        if (enemy.projectile) {
           scene.remove(enemy.projectile);
           enemy.projectile = null;
         }
+        enemy.radialProjectiles?.forEach((projectile) => scene.remove(projectile));
+        enemy.radialProjectiles = [];
+      }
+
+      function queueEnemyBurst(enemy, count, damage, explosive = false) {
+        enemy.burstRemaining = count;
+        enemy.burstTimer = 0;
+        enemy.burstDamage = damage;
+        enemy.burstExplosive = explosive;
+      }
+
+      function updateEnemyBurst(enemy, delta, originHeight) {
+        if (enemy.burstRemaining <= 0 || enemy.projectile) return;
+        enemy.burstTimer -= delta;
+        if (enemy.burstTimer > 0) return;
+        const origin = enemy.group.position.clone().add(new THREE.Vector3(0, originHeight, 0));
+        const dracoShot = enemy.type === "boss" && enemy.bossModel === "draco";
+        const hasDracoModel = dracoShot && dracoProjectileTemplate;
+        enemy.projectile = createNosiProjectile(
+          origin,
+          player.position.clone(),
+          hasDracoModel ? dracoProjectileTemplate : nosiProjectileTemplate,
+          hasDracoModel ? dracoProjectileAnimations : nosiProjectileAnimations,
+          hasDracoModel ? 2.8 : 9.6,
+          enemy.burstExplosive,
+        );
+        enemy.projectile.userData.velocity.setLength(dracoShot ? 15 : 18);
+        const projectileDamage = Number.isFinite(enemy.burstDamage)
+          ? enemy.burstDamage
+          : Number.isFinite(enemy.attackDamage) ? enemy.attackDamage : 14;
+        enemy.projectile.userData.damage = projectileDamage;
+        enemy.attackDamage = projectileDamage;
+        enemy.burstRemaining -= 1;
+        enemy.burstTimer = dracoShot ? 0.34 : 0.2;
       }
 
       function updateBoss(enemy, delta, distance, dirX, dirZ) {
         enemy.mixer?.update(delta);
-        if (enemy.modelRoot && enemy.modelRootRotation) {
-          enemy.modelRoot.quaternion.copy(enemy.modelRootRotation);
+        if (enemy.bossModel === "draco") {
+          const flyingStates = ["flightRise", "flight", "flightDescend", "ultimateRise", "ultimateChannel", "ultimateDescend"];
+          setDracoAnimation(enemy, flyingStates.includes(enemy.bossState)
+            ? "flying"
+            : distance > enemy.attackRange * 0.9 ? "running" : "idle");
         }
         updateEnemyProjectile(enemy, delta);
+        updateEnemyBurst(enemy, delta, 6.4);
+        updateDracoSkyRifts(enemy, delta);
 
-        if (enemy.timeStopPhase === "windup") {
-          enemy.timeStopMixer?.update(delta);
-          enemy.timeStopTimer -= delta;
-          if (enemy.timeStopTimer <= 0) {
-            enemy.timeStopAction.paused = true;
-            player.timeStopTimer = 2;
-            enemy.timeStopPhase = "hold";
-            enemy.timeStopTimer = 2;
-          }
-        } else if (enemy.timeStopPhase === "hold") {
-          enemy.timeStopTimer -= delta;
-          if (enemy.timeStopTimer <= 0) {
-            removeTimeStopClock(enemy);
-            enemy.timeStopPhase = null;
-            enemy.timeStopCooldown = enemy.enraged ? 15 : 24;
+        if (enemy.bossModel === "dummy") {
+          if (enemy.timeStopPhase === "windup") {
+            enemy.timeStopMixer?.update(delta);
+            enemy.timeStopTimer -= delta;
+            if (enemy.timeStopTimer <= 0) {
+              enemy.timeStopAction.paused = true;
+              player.timeStopTimer = 2;
+              enemy.timeStopPhase = "hold";
+              enemy.timeStopTimer = 2;
+            }
+          } else if (enemy.timeStopPhase === "hold") {
+            enemy.timeStopTimer -= delta;
+            if (enemy.timeStopTimer <= 0) {
+              removeTimeStopClock(enemy);
+              enemy.timeStopPhase = null;
+              enemy.timeStopCooldown = enemy.enraged ? 15 : 24;
+            }
           }
         }
 
@@ -1758,11 +2333,30 @@
           enemy.bossStateTimer -= delta;
           enemy.group.position.y += (enemy.flightHeight - enemy.group.position.y) * Math.min(1, delta * 2.5);
           if (enemy.bossStateTimer <= 0) {
-            damageBossAttack(enemy.warning.point, enemy.warning.radius, enemy.warning.damage, true);
-            enemy.additionalUltimateWarnings?.forEach((warning) => {
-              damageBossAttack(warning.point, warning.radius, warning.damage, true);
-            });
-            removeBossTelegraph(enemy);
+            if (enemy.bossModel === "dummy") {
+              damageBossAttack(enemy.warning.point, enemy.warning.radius, enemy.warning.damage, true);
+              removeBossTelegraph(enemy);
+              enemy.bossState = "ultimateDescend";
+              enemy.bossStateTimer = 1.8;
+            } else {
+              enemy.bossState = "ultimateChannel";
+              enemy.bossStateTimer = enemy.enraged ? 10 : 9;
+            }
+          }
+          return;
+        }
+
+        if (enemy.bossState === "ultimateChannel") {
+          enemy.group.position.y = enemy.flightHeight;
+          enemy.bossStateTimer -= delta;
+          enemy.ultimateDamageTimer -= delta;
+          if (enemy.ultimateDamageTimer <= 0) {
+            damagePlayer(enemy.warning.damage);
+            enemy.ultimateDamageTimer = 0.55;
+          }
+          if (enemy.bossStateTimer <= 0) {
+            removeDracoUltimateOrb(enemy);
+            enemy.warning = null;
             enemy.bossState = "ultimateDescend";
             enemy.bossStateTimer = 1.8;
           }
@@ -1775,8 +2369,47 @@
           if (enemy.bossStateTimer <= 0) {
             enemy.group.position.y = 0;
             enemy.bossState = "ground";
+            enemy.invulnerable = false;
             enemy.ultimateCooldown = enemy.enraged ? 9 : 19;
             enemy.attackCooldown = 1.5;
+          }
+          return;
+        }
+
+        if (enemy.bossModel === "draco" && enemy.bossState === "flightRise") {
+          enemy.bossStateTimer -= delta;
+          enemy.group.position.y += (enemy.flightHeight - enemy.group.position.y) * Math.min(1, delta * 2.5);
+          if (enemy.bossStateTimer <= 0) {
+            enemy.bossState = "flight";
+            enemy.bossStateTimer = enemy.enraged ? 8 : 6.5;
+            enemy.flightShotCooldown = 0.8;
+          }
+          return;
+        }
+
+        if (enemy.bossModel === "draco" && enemy.bossState === "flight") {
+          enemy.group.position.y = enemy.flightHeight;
+          enemy.bossStateTimer -= delta;
+          enemy.flightShotCooldown -= delta;
+          if (enemy.flightShotCooldown <= 0 && enemy.burstRemaining <= 0 && !enemy.projectile) {
+            queueEnemyBurst(enemy, enemy.enraged ? 4 : 3, enemy.enraged ? 34 : 24, true);
+            enemy.flightShotCooldown = enemy.enraged ? 3.2 : 4.2;
+          }
+          if (enemy.bossStateTimer <= 0 && enemy.burstRemaining <= 0 && !enemy.projectile) {
+            enemy.bossState = "flightDescend";
+            enemy.bossStateTimer = 1.6;
+          }
+          return;
+        }
+
+        if (enemy.bossModel === "draco" && enemy.bossState === "flightDescend") {
+          enemy.bossStateTimer -= delta;
+          enemy.group.position.y += (0 - enemy.group.position.y) * Math.min(1, delta * 2.5);
+          if (enemy.bossStateTimer <= 0) {
+            enemy.group.position.y = 0;
+            enemy.bossState = "ground";
+            enemy.groundPhaseTimer = enemy.enraged ? 12 : 18;
+            enemy.attackCooldown = 0.8;
           }
           return;
         }
@@ -1828,12 +2461,19 @@
         const cooldownRate = enemy.enraged ? 1.55 : 1;
         enemy.ultimateCooldown -= delta * cooldownRate;
         enemy.chargeCooldown -= delta * cooldownRate;
-        enemy.timeStopCooldown -= delta * cooldownRate;
+        if (enemy.bossModel === "dummy") enemy.timeStopCooldown -= delta * cooldownRate;
         enemy.attackCooldown -= delta * cooldownRate;
+        if (enemy.bossModel === "draco") enemy.groundPhaseTimer -= delta * cooldownRate;
         if (enemy.ultimateCooldown <= 0) {
           if (warnBossUltimate(enemy)) return;
           enemy.bossState = "ground";
           enemy.ultimateCooldown = 2;
+          return;
+        }
+
+        if (enemy.bossModel === "draco" && enemy.groundPhaseTimer <= 0) {
+          enemy.bossState = "flightRise";
+          enemy.bossStateTimer = 1.6;
           return;
         }
 
@@ -1848,7 +2488,7 @@
           return;
         }
 
-        if (enemy.timeStopCooldown <= 0 && enemy.timeStopPhase === null && startTimeStopPattern(enemy)) return;
+        if (enemy.bossModel === "dummy" && enemy.timeStopCooldown <= 0 && enemy.timeStopPhase === null && startTimeStopPattern(enemy)) return;
 
         if (distance > enemy.attackRange * 0.82) {
           const step = Math.min(enemy.speed * delta, distance - enemy.attackRange * 0.72);
@@ -1867,19 +2507,16 @@
               enemy.enraged ? 44 : 35,
             );
           } else {
-            const origin = enemy.group.position.clone().add(new THREE.Vector3(0, 6.4, 0));
-            enemy.projectileTarget = player.position.clone();
-            enemy.projectile = createNosiProjectile(origin, enemy.projectileTarget);
-            enemy.attackDamage = enemy.enraged ? 40 : 28;
-            if (enemy.enraged) enemy.projectile.userData.velocity.setLength(24);
-            enemy.attackCooldown = enemy.enraged ? 2.1 : 3.6;
+            queueEnemyBurst(enemy, enemy.enraged ? 5 : 3, enemy.enraged ? 40 : 28, true);
+            enemy.attackCooldown = enemy.enraged ? 2.8 : 4.4;
           }
         }
       }
 
       function removeEnemy(enemy) {
         scene.remove(enemy.group);
-        if (enemy.projectile) scene.remove(enemy.projectile);
+        clearEnemyProjectiles(enemy);
+        removeDracoUltimateOrb(enemy);
         removeTimeStopClock(enemy);
         removeBossTelegraph(enemy);
         for (let index = enemyMeshes.length - 1; index >= 0; index -= 1) {
@@ -1896,6 +2533,7 @@
 
       function damageEnemy(enemy, amount) {
         if (!enemies.includes(enemy)) return;
+        if (enemy.type === "boss" && enemy.invulnerable) return;
         enemy.hp = Math.max(0, enemy.hp - amount);
         if (enemy.type === "boss" && !enemy.enraged && enemy.hp > 0 && enemy.hp <= enemy.maxHp * 0.3) {
           enemy.enraged = true;
@@ -1925,7 +2563,7 @@
 
       function swingSword(heavy = false) {
         if (state !== "playing" || player.timeStopTimer > 0 || player.weaponCooldown > 0) return;
-        player.weaponCooldown = heavy ? 1.05 * player.hurricaneCooldownScale : 0.38;
+        player.weaponCooldown = heavy ? 1.05 * player.hurricaneCooldownScale : 0.24;
         player.swingDuration = heavy ? 0.62 : 0.38;
         player.swingTime = player.swingDuration;
         player.swingHeavy = heavy;
@@ -1936,6 +2574,9 @@
           }
           return;
         }
+        lightComboStep = lightComboTimer > 0 ? lightComboStep % 2 + 1 : 1;
+        lightComboTimer = 0.9;
+        player.swingCombo = lightComboStep;
         targetEnemy = findTarget();
         const attackRange = 4.6;
         if (targetEnemy && Math.hypot(targetEnemy.group.position.x - player.position.x, targetEnemy.group.position.z - player.position.z) > attackRange) {
@@ -1956,18 +2597,19 @@
           });
           targetEnemy = closest;
         }
-        if (targetEnemy) damageEnemy(targetEnemy, player.damage * player.damageScale);
+        launchMeleeSlash(lightComboStep, targetEnemy);
       }
 
       function updateTarget() {
         targetEnemy = findTarget();
+        if (!targetEnemy) targetEnemy = enemies.find((enemy) => enemy.type === "boss") ?? null;
         if (!targetEnemy) {
           dom.targetBox.classList.remove("is-visible");
           dom.targetBox.classList.remove("is-enraged");
           return;
         }
         dom.targetName.textContent = targetEnemy.type === "boss"
-          ? targetEnemy.enraged ? "더미 · 광폭화" : "더미 · 보스"
+          ? `${targetEnemy.bossModel === "dummy" ? "더미" : "드라코"} · ${targetEnemy.enraged ? "광폭화" : "보스"}`
           : targetEnemy.type === "nozzle" ? "노즐 · 추격형" : "노시 · 공중 포격형";
         dom.targetBox.classList.toggle("is-enraged", targetEnemy.type === "boss" && targetEnemy.enraged);
         dom.targetHealth.textContent = `${Math.max(0, Math.ceil(targetEnemy.hp))} / ${Math.ceil(targetEnemy.maxHp)}`;
@@ -1995,6 +2637,7 @@
       function updatePlayer(delta) {
         if (player.timeStopTimer > 0) {
           player.timeStopTimer = Math.max(0, player.timeStopTimer - delta);
+          player.invulnerable = Math.max(0, player.invulnerable - delta);
           player.velocityY = 0;
           player.dashTime = 0;
           camera.position.copy(player.position);
@@ -2074,6 +2717,8 @@
         player.invulnerable = Math.max(0, player.invulnerable - delta);
         player.weaponCooldown = Math.max(0, player.weaponCooldown - delta);
         player.swingTime = Math.max(0, player.swingTime - delta);
+        lightComboTimer = Math.max(0, lightComboTimer - delta);
+        if (lightComboTimer === 0) lightComboStep = 0;
         player.dashReady = player.dashCooldown <= 0;
         camera.position.copy(player.position);
         camera.rotation.set(pitch, yaw, 0, "YXZ");
@@ -2083,10 +2728,11 @@
         const windup = swinging ? 1 - THREE.MathUtils.smoothstep(swingProgress, 0, 0.24) : 0;
         const followThrough = swinging ? THREE.MathUtils.smoothstep(swingProgress, 0.58, 0.94) : 0;
         const swingPower = player.swingHeavy ? 1.15 : 0.9;
+        const comboTilt = player.swingCombo === 3 ? 0.48 : player.swingCombo === 2 ? -0.42 : 0.18;
         sword.rotation.set(
           -0.12 - swingArc * 0.95 * swingPower,
           0.08 + swingArc * 0.18 * swingPower,
-          -0.32 + windup * 0.32 - swingArc * 0.62 * swingPower + followThrough * 0.18,
+          -0.32 + windup * 0.32 - swingArc * 0.62 * swingPower + followThrough * 0.18 + comboTilt * swingArc,
         );
         sword.position.set(
           0.48 - windup * 0.02 + swingArc * 0.04,
@@ -2127,6 +2773,42 @@
               }
               enemy.lodTimer = 0.25;
             }
+            if (stage >= 3) enemy.dashCooldown -= delta;
+            if (enemy.chargeState === "windup") {
+              enemy.chargeTimer -= delta;
+              if (enemy.chargeTimer <= 0) {
+                enemy.chargeState = "dash";
+                enemy.chargeTimer = 0.62;
+              }
+              setNozzleAnimation(enemy, "Attack");
+              enemy.mixer.update(delta);
+              continue;
+            }
+            if (enemy.chargeState === "dash") {
+              enemy.chargeTimer -= delta;
+              const progress = THREE.MathUtils.clamp(1 - enemy.chargeTimer / 0.62, 0, 1);
+              position.lerpVectors(enemy.chargeStart, enemy.chargeEnd, progress);
+              if (!enemy.chargeHit
+                  && Math.hypot(player.position.x - position.x, player.position.z - position.z) < 2.8) {
+                damagePlayer(32 + stage * 2);
+                enemy.chargeHit = true;
+              }
+              if (enemy.chargeTimer <= 0) {
+                removeBossTelegraph(enemy);
+                enemy.chargeState = null;
+                enemy.dashCooldown = 9 + Math.random() * 3;
+                enemy.attackCooldown = 0.8;
+              }
+              setNozzleAnimation(enemy, "Walk");
+              enemy.mixer.update(delta);
+              continue;
+            }
+            if (stage >= 3 && enemy.dashCooldown <= 0 && distance > 7) {
+              warnNozzleCharge(enemy);
+              setNozzleAnimation(enemy, "Attack");
+              enemy.mixer.update(delta);
+              continue;
+            }
             const isMoving = distance > enemy.attackRange * 0.78;
             if (isMoving) {
               const step = Math.min(enemy.speed * enemySpeedScale * delta, distance - enemy.attackRange * 0.72);
@@ -2147,13 +2829,11 @@
             position.y = Math.sin(enemy.age * 2.1) * 0.28;
             enemy.mixer?.update(delta);
             enemy.attackCooldown -= delta;
-            if (!enemy.projectile && enemy.attackCooldown <= 0) {
-              const origin = position.clone().add(new THREE.Vector3(0, 3.4, 0));
-              enemy.projectileTarget = player.position.clone();
-              enemy.projectile = createNosiProjectile(origin, enemy.projectileTarget);
-              enemy.attackCooldown = 3.5;
+            if ((!enemy.radialProjectiles || enemy.radialProjectiles.length === 0) && enemy.attackCooldown <= 0) {
+              fireNosiRadial(enemy);
+              enemy.attackCooldown = stage >= 4 ? 4.8 : 3.5;
             }
-            updateEnemyProjectile(enemy, delta);
+            updateNosiProjectiles(enemy, delta);
           }
         }
       }
@@ -2188,6 +2868,7 @@
         updateBossCountdown(delta);
         if (state === "playing") updateGame(delta);
         updateExplosionEffects(delta);
+        if (showDebug) updateDebugPanel();
         if (merchant.visible) {
           merchantBob += delta;
           merchant.position.y = Math.sin(merchantBob * 2.1) * 0.13;
@@ -2210,8 +2891,10 @@
         }
       }
 
-      $("#start-button").addEventListener("click", startRun);
-      $("#boss-start-button").addEventListener("click", () => startRun(true));
+      stageSelect.addEventListener("change", updateStageChallengeButton);
+      $("#start-button").addEventListener("click", () => startRun(Number(stageSelect.value), "draco"));
+      $("#dummy-start-button").addEventListener("click", () => startRun(5, "dummy"));
+      $("#boss-start-button").addEventListener("click", () => startRun(5, "draco"));
       $("#next-stage-button").addEventListener("click", () => startStage());
       $("#skip-shop-button").addEventListener("click", () => startStage());
       $("#boss-shortcut-button").addEventListener("click", () => {
@@ -2224,7 +2907,7 @@
         player.health = Math.min(player.maxHealth, player.health + 40);
         updateHud();
       });
-      $("#retry-button").addEventListener("click", startRun);
+      $("#retry-button").addEventListener("click", () => startRun(stage, runBossModel));
       $("#quit-button").addEventListener("click", () => {
         state = "intro";
         merchant.visible = false;
@@ -2261,6 +2944,23 @@
       document.addEventListener("keydown", (event) => {
         if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) event.preventDefault();
         if (event.code === "Escape") return;
+        if (event.code === "KeyQ") {
+          if (!event.repeat && state === "playing" && player.timeStopTimer <= 0
+              && player.healCharges > 0 && player.health < player.maxHealth) {
+            player.healCharges -= 1;
+            player.health = Math.min(player.maxHealth, player.health + 30);
+            healFlash.classList.remove("is-active");
+            void healFlash.offsetWidth;
+            healFlash.classList.add("is-active");
+            updateHud();
+          }
+          return;
+        }
+        if (event.code === "KeyT" && !event.repeat) {
+          showDebug = !showDebug;
+          dom.debugPanel.hidden = !showDebug;
+          updateDebugPanel();
+        }
         if (state === "playing" && player.timeStopTimer > 0) return;
         if ((event.code === "Space" || event.code.startsWith("Shift")) && event.repeat) return;
         if (event.code === "Space" || event.code.startsWith("Key") || event.code.startsWith("Shift")) keys.add(event.code);
