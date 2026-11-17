@@ -409,11 +409,11 @@
       <div class="panel" id="intro-panel">
         <div class="eyebrow">ARENA SURVIVAL · FIRST PERSON</div>
         <h1>3D 회피 서바이버</h1>
-        <p class="panel-copy">몰려오는 적을 피하고 포인트를 모아 스테이지에서 탈출하세요. 스테이지가 오를수록 더 많은 적이 한꺼번에 등장하며, 마지막 스테이지에서는 보스 드라코와 싸웁니다.</p>
+        <p class="panel-copy">몰려오는 적을 피하고 좌클릭 3연속 검격으로 쓰러뜨리세요. 1·2타의 대각선 검격을 잇고 3타에서 X 피니시를 발동하세요. 스테이지가 오를수록 더 많은 적이 한꺼번에 등장하며, 마지막 스테이지에서는 보스 드라코와 싸웁니다.</p>
         <div class="key-list">
           <div><kbd>WASD</kbd><span>이동과 회피</span></div>
           <div><kbd>MOUSE</kbd><span>시야 조준</span></div>
-          <div><kbd>LEFT CLICK</kbd><span>2연속 검기</span></div>
+          <div><kbd>LEFT CLICK</kbd><span>1타·2타 연속 검격 · 3타 X 피니시</span></div>
           <div><kbd>RIGHT CLICK</kbd><span>허리케인 직선 발사</span></div>
           <div><kbd>SHIFT</kbd><span>방향 돌진</span></div>
           <div><kbd>SPACE</kbd><span>점프, 공중에서 2단 점프</span></div>
@@ -629,12 +629,19 @@
         console.error("드라코 필살기 효과를 불러오지 못했습니다.", error);
       });
 
-      let attackSlashesTemplate = null;
-      const attackSlashesLoader = new GLTFLoader();
-      attackSlashesLoader.load("assets/textures/attack_slashes.glb", (gltf) => {
-        attackSlashesTemplate = gltf.scene;
-      }, undefined, (error) => {
-        console.error("검기 에셋을 불러오지 못했습니다.", error);
+      const playerAttackTemplates = [null, null, null, null];
+      const playerAttackFiles = [
+        "01_stage1_left_bottom_to_right_top.glb",
+        "02_stage2_second_diagonal_overlay.glb",
+        "02_stage2_two_diagonals_cross.glb",
+        "03_stage3_complete_X_with_impact.glb",
+      ];
+      playerAttackFiles.forEach((file, index) => {
+        new GLTFLoader().load(`assets/textures/${file}`, (gltf) => {
+          playerAttackTemplates[index] = { scene: gltf.scene, animations: gltf.animations };
+        }, undefined, (error) => {
+          console.error(`플레이어 검격 에셋을 불러오지 못했습니다: ${file}`, error);
+        });
       });
 
       let clockLoopTemplate = null;
@@ -1014,6 +1021,7 @@
       const keys = new Set();
       const enemies = [];
       const slashProjectiles = [];
+      const playerAttackEffects = [];
       const healFlash = $("#heal-flash");
       const explosionEffects = [];
       let dracoSafeDome = null;
@@ -1831,6 +1839,7 @@
         player.weaponCooldown = 0;
         lightComboStep = 0;
         lightComboTimer = 0;
+        clearPlayerAttackEffects();
         player.dashReady = true;
         dom.targetBox.classList.remove("is-enraged");
         enemyHealthScale = enemySpeedScale = enemyDamageScale = 1;
@@ -1974,45 +1983,77 @@
         return new THREE.ShapeGeometry(shape);
       }
 
-      function createAttackSlashModel(size) {
-        if (!attackSlashesTemplate) return null;
-        const model = cloneSkinnedModel(attackSlashesTemplate);
-        const selectedSlash = model.getObjectByName("Circle.003_slash_0");
-        if (!selectedSlash) return null;
-        const requiredNodes = new Set();
-        for (let node = selectedSlash; node; node = node.parent) requiredNodes.add(node);
-        const pruneMeshes = (node) => {
-          [...node.children].forEach((child) => {
-            if (!requiredNodes.has(child)) node.remove(child);
-            else pruneMeshes(child);
+      function playPlayerAttackEffect(stageIndex, direction, damage, onComplete = null) {
+        const template = playerAttackTemplates[stageIndex];
+        const group = new THREE.Group();
+        let mixer = null;
+        let duration = stageIndex === 2 ? 0.95 : 0.35;
+
+        if (template) {
+          const model = cloneSkinnedModel(template.scene);
+          model.updateMatrixWorld(true);
+          const bounds = new THREE.Box3().setFromObject(model);
+          const size = bounds.getSize(new THREE.Vector3());
+          const center = bounds.getCenter(new THREE.Vector3());
+          const scale = 4.6 / Math.max(size.x, size.y, size.z, 0.001);
+          model.scale.setScalar(scale);
+          model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+          model.traverse((object) => {
+            if (object.isMesh) object.frustumCulled = false;
           });
-        };
-        pruneMeshes(model);
-        model.updateMatrixWorld(true);
-        const bounds = new THREE.Box3().setFromObject(model);
-        const modelSize = bounds.getSize(new THREE.Vector3());
-        const center = bounds.getCenter(new THREE.Vector3());
-        const scale = size / Math.max(modelSize.x, modelSize.y, modelSize.z, 0.001);
-        model.scale.setScalar(scale);
-        model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
-        const materials = [];
-        model.traverse((object) => {
-          if (!object.isMesh) return;
-          object.frustumCulled = false;
-          object.material = Array.isArray(object.material)
-            ? object.material.map((material) => material.clone())
-            : object.material.clone();
-          const meshMaterials = Array.isArray(object.material) ? object.material : [object.material];
-          meshMaterials.forEach((material) => {
-            material.transparent = true;
-            material.depthWrite = false;
-            material.side = THREE.DoubleSide;
-            material.userData.baseOpacity = material.opacity;
-            if ("emissiveIntensity" in material) material.emissiveIntensity = Math.max(material.emissiveIntensity, 1.35);
-            materials.push(material);
-          });
+          group.add(model);
+
+          if (template.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(model);
+            template.animations.forEach((clip) => {
+              duration = Math.max(duration, clip.duration);
+              const action = mixer.clipAction(clip);
+              action.setLoop(THREE.LoopOnce, 1);
+              action.clampWhenFinished = true;
+              action.play();
+            });
+          }
+        }
+
+        group.position.copy(player.position).addScaledVector(direction, 5.55);
+        group.position.y += 0.05;
+        group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+        if (template) scene.add(group);
+        playerAttackEffects.push({
+          group,
+          mixer,
+          duration,
+          elapsed: 0,
+          onComplete,
+          damage,
+          hitEnemies: new Set(),
         });
-        return { model, materials };
+      }
+
+      function updatePlayerAttackEffects(delta) {
+        for (let index = playerAttackEffects.length - 1; index >= 0; index -= 1) {
+          const effect = playerAttackEffects[index];
+          effect.elapsed += delta;
+          effect.mixer?.update(delta);
+          if (state === "playing") {
+            [...enemies].forEach((enemy) => {
+              if (effect.hitEnemies.has(enemy)
+                  || enemy.group.position.distanceTo(effect.group.position) > 2.55) return;
+              effect.hitEnemies.add(enemy);
+              damageEnemy(enemy, effect.damage);
+            });
+          }
+          if (effect.elapsed < effect.duration) continue;
+
+          scene.remove(effect.group);
+          playerAttackEffects.splice(index, 1);
+          effect.onComplete?.();
+        }
+      }
+
+      function clearPlayerAttackEffects() {
+        playerAttackEffects.forEach((effect) => scene.remove(effect.group));
+        playerAttackEffects.length = 0;
       }
 
       function launchMeleeSlash(combo, target = null) {
@@ -2023,39 +2064,17 @@
             Math.sin(pitch),
             -Math.cos(yaw) * Math.cos(pitch),
           ).normalize();
-        const origin = player.position.clone().addScaledVector(direction, 1.3);
-        origin.y += 0.12;
-        const mesh = new THREE.Group();
-        const slashAsset = createAttackSlashModel(5.2);
-        const materials = slashAsset?.materials ?? [];
-        if (slashAsset) {
-          slashAsset.model.scale.y *= 0.44;
-          slashAsset.model.scale.z *= 0.68;
-          mesh.add(slashAsset.model);
-        } else {
-          const material = new THREE.MeshBasicMaterial({ color: 0xb45bfa, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
-          const blade = new THREE.Mesh(createSlashBlade(2.4, 0.72), material);
-          mesh.add(blade);
-          materials.push(material);
-        }
-        mesh.position.copy(origin);
-        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
-        mesh.rotateZ(combo === 1 ? -Math.PI / 4 : Math.PI / 4);
-        scene.add(mesh);
-        const speed = 18;
-        const maxDistance = 3.2;
-        slashProjectiles.push({
-          mesh,
-          velocity: direction.clone().multiplyScalar(speed),
-          distance: 0,
-          maxDistance,
-          life: maxDistance / speed,
-          meleeEffect: true,
-          hitEnemies: new Set(),
-          materials,
-          sharedModel: true,
-          damage: player.damage * player.damageScale * (combo === 2 ? 1.15 : 0.8),
-        });
+        const attackEffectIndex = combo === 1 ? 0 : combo === 2 ? 1 : 3;
+        const damage = player.damage * player.damageScale
+          * (combo === 3 ? 1.7 : combo === 2 ? 1.15 : 0.8);
+        playPlayerAttackEffect(
+          attackEffectIndex,
+          direction,
+          damage,
+          combo === 2
+            ? () => playPlayerAttackEffect(2, direction, player.damage * player.damageScale * 0.55)
+            : null,
+        );
       }
 
       function launchSlashProjectile(yawOffset = 0) {
@@ -2574,11 +2593,11 @@
           }
           return;
         }
-        lightComboStep = lightComboTimer > 0 ? lightComboStep % 2 + 1 : 1;
-        lightComboTimer = 0.9;
+        lightComboStep = lightComboTimer > 0 ? lightComboStep % 3 + 1 : 1;
+        lightComboTimer = 1.1;
         player.swingCombo = lightComboStep;
         targetEnemy = findTarget();
-        const attackRange = 4.6;
+        const attackRange = 8.1;
         if (targetEnemy && Math.hypot(targetEnemy.group.position.x - player.position.x, targetEnemy.group.position.z - player.position.z) > attackRange) {
           targetEnemy = null;
         }
@@ -2868,6 +2887,7 @@
         updateBossCountdown(delta);
         if (state === "playing") updateGame(delta);
         updateExplosionEffects(delta);
+        updatePlayerAttackEffects(delta);
         if (showDebug) updateDebugPanel();
         if (merchant.visible) {
           merchantBob += delta;
