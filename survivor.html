@@ -170,6 +170,20 @@
     .time-heading { justify-content: flex-end; color: #a5b5a9; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
     .time-value { display: block; margin-top: 5px; font-size: 25px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .stage-value { margin-top: 4px; color: #d9bd7e; font-size: 12px; }
+    .sound-toggle {
+      margin-top: 9px;
+      padding: 6px 9px;
+      border: 1px solid #536255;
+      border-radius: 2px;
+      background: #202a23;
+      color: #dce5d8;
+      font-size: 11px;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .sound-toggle:hover { border-color: #d3b36e; }
+    .sound-toggle:focus-visible { outline: 2px solid #f1e7c7; outline-offset: 3px; }
 
     .crosshair {
       position: absolute;
@@ -390,6 +404,7 @@
         <div class="time-heading">버틴 시간</div>
         <strong class="time-value" id="time-value">00:00</strong>
         <div class="stage-value">STAGE <span id="stage-value">1</span> / 5</div>
+        <button class="sound-toggle" id="sound-toggle" type="button" aria-pressed="true">사운드 켜짐</button>
       </div>
 
       <div class="crosshair" aria-hidden="true"></div>
@@ -485,6 +500,75 @@
       "use strict";
 
       const $ = (selector) => document.querySelector(selector);
+      const soundButton = $("#sound-toggle");
+      const soundPatterns = {
+        sword: [[560, 150, 0.18, "sawtooth", 0.045], [940, 420, 0.1, "triangle", 0.022]],
+        impact: [[230, 82, 0.11, "triangle", 0.038]],
+        hurt: [[170, 52, 0.28, "square", 0.065]],
+        ultimate: [[110, 38, 0.82, "sawtooth", 0.06], [260, 74, 0.68, "triangle", 0.055]],
+        start: [[392, 784, 0.22, "sine", 0.035]],
+        ui: [[620, 880, 0.12, "sine", 0.03]],
+      };
+      let soundEnabled = true;
+      let audioContext = null;
+      let audioResumePending = false;
+      let lastImpactSound = 0;
+
+      function getArenaAudioContext() {
+        if (!soundEnabled) return null;
+        const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextConstructor) {
+          soundButton.disabled = true;
+          soundButton.textContent = "사운드 미지원";
+          return null;
+        }
+        if (!audioContext) audioContext = new AudioContextConstructor();
+        if (audioContext.state === "suspended" && !audioResumePending) {
+          audioResumePending = true;
+          audioContext.resume().then(() => {
+            audioResumePending = false;
+          }).catch((error) => {
+            audioResumePending = false;
+            console.warn("아레나 사운드를 시작하지 못했습니다.", error);
+          });
+        }
+        return audioContext;
+      }
+
+      function playArenaSound(kind) {
+        const pattern = soundPatterns[kind];
+        if (!pattern) return;
+        if (kind === "impact") {
+          const now = performance.now();
+          if (now - lastImpactSound < 80) return;
+          lastImpactSound = now;
+        }
+        const context = getArenaAudioContext();
+        if (!context) return;
+        const now = context.currentTime;
+        pattern.forEach(([startFrequency, endFrequency, duration, waveform, volume], index) => {
+          const oscillator = context.createOscillator();
+          const envelope = context.createGain();
+          const onset = now + index * 0.025;
+          oscillator.type = waveform;
+          oscillator.frequency.setValueAtTime(startFrequency, onset);
+          oscillator.frequency.exponentialRampToValueAtTime(endFrequency, onset + duration);
+          envelope.gain.setValueAtTime(0.0001, onset);
+          envelope.gain.exponentialRampToValueAtTime(volume, onset + 0.012);
+          envelope.gain.exponentialRampToValueAtTime(0.0001, onset + duration);
+          oscillator.connect(envelope);
+          envelope.connect(context.destination);
+          oscillator.start(onset);
+          oscillator.stop(onset + duration);
+        });
+      }
+
+      soundButton.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        soundButton.textContent = soundEnabled ? "사운드 켜짐" : "사운드 꺼짐";
+        soundButton.setAttribute("aria-pressed", String(soundEnabled));
+        if (soundEnabled) playArenaSound("ui");
+      });
       const screen = $("#screen");
       const panels = ["#intro-panel", "#shop-panel", "#pause-panel", "#end-panel"].map($);
       const mount = $("#game-mount");
@@ -1828,6 +1912,7 @@
       }
 
       function startRun(startAtStage = 1, bossModel = "draco") {
+        playArenaSound("start");
         clearSlashProjectiles();
         bossCountdownTimer = 0;
         bossCountdown.hidden = true;
@@ -2151,6 +2236,7 @@
 
       function castUltimate() {
         if (state !== "playing" || player.timeStopTimer > 0 || player.ultimateCooldown > 0) return;
+        playArenaSound("ultimate");
         player.ultimateCooldown = 60;
         const count = player.ultimateMode === "radial" ? 8 : player.ultimateMode === "orbit" ? 4 : 6;
         for (let index = 0; index < count; index += 1) {
@@ -2270,6 +2356,7 @@
           damage = 1;
         }
         player.health = Math.max(0, player.health - damage);
+        playArenaSound("hurt");
         const hitFlash = $("#hit-flash");
         hitFlash.classList.remove("is-active");
         void hitFlash.offsetWidth;
@@ -2685,6 +2772,7 @@
         if (!enemies.includes(enemy)) return;
         if (enemy.type === "boss" && enemy.invulnerable) return;
         enemy.hp = Math.max(0, enemy.hp - amount);
+        playArenaSound("impact");
         if (enemy.type === "boss" && !enemy.enraged && enemy.hp > 0 && enemy.hp <= enemy.maxHp * 0.3) {
           enemy.enraged = true;
           enemy.speed *= 1.4;
@@ -2713,6 +2801,7 @@
 
       function swingSword() {
         if (state !== "playing" || player.timeStopTimer > 0 || player.weaponCooldown > 0) return;
+        playArenaSound("sword");
         player.weaponCooldown = 0.24;
         player.swingDuration = 0.38;
         player.swingTime = player.swingDuration;

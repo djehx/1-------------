@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0c1420">
+    <title>균열 방어전 | 타워 디펜스</title>
+    <link rel="stylesheet" href="tower-defense.css">
+  </head>
+  <body>
+    <main class="defense">
+      <canvas id="defense-canvas" aria-label="3D 균열 방어 타워 디펜스 게임 화면"></canvas>
+
+      <header class="topbar">
+        <a class="back-link" href="index.html">← 메인으로</a>
+        <div class="game-title">
+          <span>RIFT CORE DEFENSE</span>
+          <h1>균열 방어전</h1>
+        </div>
+        <button class="sound-button" id="sound-toggle" type="button" aria-pressed="true">사운드 켜짐</button>
+      </header>
+
+      <section class="battle-stats" aria-label="전투 상태">
+        <div><span>스테이지</span><strong id="wave-value">1 / 5</strong></div>
+        <div><span>보유 골드</span><strong><b id="gold-value">240</b> G</strong></div>
+        <div><span>균열핵 내구도</span><strong><b id="gate-value">20</b> / 20</strong></div>
+        <div><span>접근 중인 적</span><strong id="enemy-value">0</strong></div>
+      </section>
+
+      <aside class="build-panel" aria-label="타워 건설 및 스테이지 제어">
+        <div class="panel-heading">
+          <span class="eyebrow">RIFT COMMAND</span>
+          <h2>방어 지휘</h2>
+        </div>
+        <p class="panel-copy">길 밖의 빈 땅을 선택해 타워를 건설하세요.</p>
+
+        <div class="tower-options" aria-label="건설할 타워 선택">
+          <button class="tower-option" type="button" data-build="bolt" aria-pressed="false">
+            <span class="tower-option__icon tower-option__icon--bolt">✦</span>
+            <span><strong>태양 석궁</strong><small>단일 · 빠른 사격</small></span>
+            <b>55 G</b>
+          </button>
+          <button class="tower-option" type="button" data-build="frost" aria-pressed="false">
+            <span class="tower-option__icon tower-option__icon--frost">❄</span>
+            <span><strong>빙결 수정</strong><small>범위 · 적 둔화</small></span>
+            <b>80 G</b>
+          </button>
+          <button class="tower-option" type="button" data-build="storm" aria-pressed="false">
+            <span class="tower-option__icon tower-option__icon--storm">ϟ</span>
+            <span><strong>폭풍 토템</strong><small>광역 · 강한 충격</small></span>
+            <b>110 G</b>
+          </button>
+        </div>
+
+        <div class="selection-card" id="selection-card">
+          <div class="selection-card__top">
+            <span class="eyebrow">선택된 타워</span>
+            <strong id="selected-tower-name">없음</strong>
+          </div>
+          <p id="selected-tower-info">건설할 타워를 고르거나 이미 지은 타워를 클릭하세요.</p>
+          <div class="selection-actions">
+            <button type="button" id="upgrade-button" disabled>강화</button>
+            <button type="button" id="sell-button" disabled>철거</button>
+          </div>
+        </div>
+
+        <div class="command-actions">
+          <button class="wave-button" id="wave-button" type="button">스테이지 시작</button>
+          <button class="pause-button" id="pause-button" type="button" disabled>일시 정지</button>
+        </div>
+        <p class="status-message" id="status-message" role="status" aria-live="polite">
+          적이 오기 전에 골드를 사용해 방어선을 준비하세요.
+        </p>
+        <div class="asset-status" id="asset-status" role="status" aria-live="polite">균열 전투 에셋을 불러오는 중…</div>
+      </aside>
+
+      <div class="map-hint" id="map-hint">
+        <span class="map-hint__dot"></span>
+        노시 · 드래곤 · 균열 수정 타워 · 휠 확대/축소
+      </div>
+
+      <section class="end-overlay" id="end-overlay" hidden aria-live="polite">
+        <div class="end-card">
+          <span class="eyebrow">RIFT REPORT</span>
+          <h2 id="end-title">균열핵을 지켜냈습니다</h2>
+          <p id="end-copy"></p>
+          <button class="wave-button" id="restart-button" type="button">다시 시작</button>
+          <a class="back-link" href="index.html">메인 페이지</a>
+        </div>
+      </section>
+    </main>
+
+    <script type="importmap">
+      {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"}}
+    </script>
+    <script type="module" src="tower-defense.js"></script>
+  </body>
+</html>

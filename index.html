@@ -29,19 +29,19 @@
         <ol class="idea-list">
           <li>
             <article class="game-idea" tabindex="0">
-              <h3>타워 디펜스 (무제)</h3>
+              <h3>균열 방어전 (3D 타워 디펜스)</h3>
               <dl class="game-idea__details" aria-live="polite">
                 <div class="game-idea__step" hidden>
                   <dt>한 줄 설명</dt>
-                  <dd>몰려오는 적으로부터 타워를 지키는 것이 목표입니다.</dd>
+                  <dd>서로 다른 균열에서 몰려오는 적을 막고 균열핵을 지키는 것이 목표입니다.</dd>
                 </div>
                 <div class="game-idea__step" hidden>
                   <dt>플레이어가 하는 일</dt>
-                  <dd>각 라운드에서 일정량의 골드를 획득하고, 골드를 사용해 적을 막습니다.</dd>
+                  <dd>골드로 공격·빙결·번개 타워를 배치하고 강화해 늘어나는 적 출현 지점을 방어합니다.</dd>
                 </div>
                 <div class="game-idea__step" hidden>
                   <dt>게임이 끝나는 조건</dt>
-                  <dd>100개 스테이지를 모두 클리어하면 게임이 종료됩니다.</dd>
+                  <dd>다섯 스테이지를 모두 막아내면 게임이 종료됩니다.</dd>
                 </div>
               </dl>
             </article>
@@ -88,59 +88,16 @@
       </section>
 
       <section class="tower-defense" id="tower-defense" aria-labelledby="tower-defense-title">
-        <header class="tower-defense__header">
-          <p class="tower-defense__eyebrow">미니게임</p>
-          <h2 id="tower-defense-title">타워 디펜스</h2>
-        </header>
-
-        <dl class="tower-defense__stats" aria-label="게임 상태">
-          <div>
-            <dt>스테이지</dt>
-            <dd id="stage-value">1 / 5</dd>
+        <div class="tower-defense-portal">
+          <div class="tower-defense-portal__copy">
+            <p class="tower-defense__eyebrow">별도 미니게임</p>
+            <h2 id="tower-defense-title">3D 타워 디펜스</h2>
+            <p>서로 다른 균열에서 몰려오는 적을 막고, 개성 있는 타워로 균열핵을 지키세요.</p>
           </div>
-          <div>
-            <dt>골드</dt>
-            <dd><span id="gold-value">300</span>원</dd>
-          </div>
-          <div>
-            <dt>성문 체력</dt>
-            <dd id="health-value">12</dd>
-          </div>
-          <div>
-            <dt>남은 적</dt>
-            <dd id="enemy-value">0</dd>
-          </div>
-        </dl>
-
-        <div class="tower-defense__board-wrap">
-          <canvas id="tower-board" width="720" height="360" aria-label="타워를 배치하고 적을 막는 타워 디펜스 게임 보드">
-            이 게임을 플레이하려면 캔버스를 지원하는 브라우저가 필요합니다.
-          </canvas>
-          <div class="tower-defense__overlay" id="game-overlay" hidden aria-live="polite">
-            <p id="overlay-message"></p>
-            <button class="tower-defense__button" id="overlay-restart" type="button" hidden>다시 시작</button>
-          </div>
+          <a class="tower-defense-portal__link" href="tower-defense.html">
+            타워 디펜스 시작 <span aria-hidden="true">↗</span>
+          </a>
         </div>
-
-        <div class="tower-defense__controls">
-          <div class="tower-defense__tower-picker" aria-label="설치할 타워 선택">
-            <button class="tower-defense__tower-button" type="button" data-tower="crossbow" aria-pressed="false">
-              <span>석궁 타워</span>
-              <small>50원 · 피해 5 · 1초</small>
-            </button>
-            <button class="tower-defense__tower-button" type="button" data-tower="ice" aria-pressed="false">
-              <span>아이스 타워</span>
-              <small>60원 · 피해 1 · 3초</small>
-            </button>
-          </div>
-          <div class="tower-defense__actions">
-            <button class="tower-defense__button tower-defense__button--primary" id="game-start" type="button">게임 시작</button>
-            <button class="tower-defense__button" id="game-restart" type="button" hidden>다시 시작</button>
-          </div>
-        </div>
-
-        <p class="tower-defense__status" id="game-status" role="status" aria-live="polite">타워를 선택하고 보드의 빈 칸을 눌러 설치하세요.</p>
-        <p class="tower-defense__help">타워를 고른 뒤 보드의 빈 칸을 눌러 설치하세요. 스테이지가 시작되면 타워가 자동으로 공격합니다.</p>
       </section>
 
       <footer class="page-footer">
