@@ -322,6 +322,7 @@
 
     .shop-choice:hover:not(:disabled) { border-color: #d3b36e; background: #2a342b; }
     .shop-choice:disabled { cursor: not-allowed; opacity: .42; }
+    .shop-choice.is-selected { border-color: #e7c47e; box-shadow: inset 0 0 0 1px #e7c47e; }
     .shop-choice strong { color: #e7c47e; font-size: 14px; }
     .shop-choice span { color: #bcc5b9; font-size: 12px; line-height: 1.6; }
     .shop-choice small { color: #d5d9ce; font-size: 11px; }
@@ -377,6 +378,7 @@
           <div><span class="stat-label">재화</span><strong class="stat-value" id="currency-value">0</strong></div>
         </div>
         <div class="heal-charge"><span><kbd>Q</kbd> 체력 30 회복</span><strong><span id="heal-charges">2</span> / 2</strong></div>
+        <div class="heal-charge"><span><kbd>R</kbd> 궁극기</span><strong id="ultimate-cooldown">사용 가능</strong></div>
       </div>
 
       <div class="target-box hud-panel" id="target-box" aria-live="polite">
@@ -392,7 +394,7 @@
 
       <div class="crosshair" aria-hidden="true"></div>
       <div class="controls-hint hud-panel">
-        <kbd>W</kbd> 앞으로 · <kbd>A</kbd> 왼쪽 · <kbd>S</kbd> 뒤로 · <kbd>D</kbd> 오른쪽 · 마우스 조준 · 좌클릭 검격 · 우클릭 허리케인 발사 · <kbd>SHIFT</kbd> 돌진 · <kbd>SPACE</kbd> 2단 점프
+        <kbd>W</kbd> 앞으로 · <kbd>A</kbd> 왼쪽 · <kbd>S</kbd> 뒤로 · <kbd>D</kbd> 오른쪽 · 마우스 조준 · 좌클릭 검격 · <kbd>R</kbd> 궁극기 · <kbd>SHIFT</kbd> 돌진 · <kbd>SPACE</kbd> 2단 점프
       </div>
       <aside class="debug-panel" id="debug-panel" aria-label="디버그 정보" aria-live="polite" hidden>
         <div class="debug-panel__title">DEBUG · T 키로 전환</div>
@@ -414,7 +416,7 @@
           <div><kbd>WASD</kbd><span>이동과 회피</span></div>
           <div><kbd>MOUSE</kbd><span>시야 조준</span></div>
           <div><kbd>LEFT CLICK</kbd><span>1타·2타 연속 검격 · 3타 X 피니시</span></div>
-          <div><kbd>RIGHT CLICK</kbd><span>허리케인 직선 발사</span></div>
+          <div><kbd>R</kbd><span>궁극기 · 60초 재사용 대기시간</span></div>
           <div><kbd>SHIFT</kbd><span>방향 돌진</span></div>
           <div><kbd>SPACE</kbd><span>점프, 공중에서 2단 점프</span></div>
           <div><kbd>ESC</kbd><span>일시 정지</span></div>
@@ -447,9 +449,9 @@
           <button class="shop-choice" type="button" data-upgrade="vitality"><strong>응급 회복</strong><span>체력을 35 회복하고 최대 체력을 10 늘립니다.</span><small>비용 4</small></button>
           <button class="shop-choice" type="button" data-upgrade="weaken"><strong>노즐 약화</strong><span>적의 이동 속도와 공격력이 15% 감소합니다.</span><small>비용 3</small></button>
           <button class="shop-choice" type="button" data-upgrade="fracture"><strong>균열의 표식</strong><span>적의 체력이 20% 감소합니다.</span><small>비용 4</small></button>
-          <button class="shop-choice" type="button" data-upgrade="hurricaneCount"><strong>회오리 분열</strong><span>우클릭 허리케인이 좌우로 퍼져 나갑니다. 최대 3발까지 발사합니다.</span><small>비용 5</small></button>
-          <button class="shop-choice" type="button" data-upgrade="hurricaneDamage"><strong>화염 압축</strong><span>우클릭 허리케인 공격력이 25% 증가합니다.</span><small>비용 4</small></button>
-          <button class="shop-choice" type="button" data-upgrade="hurricaneCooldown"><strong>신속한 재장전</strong><span>우클릭 허리케인의 재사용 대기시간이 15% 감소합니다.</span><small>비용 4</small></button>
+          <button class="shop-choice" type="button" data-ultimate="radial" aria-pressed="true"><strong>폭풍의 탄생</strong><span>기본 궁극기. 거대한 토네이도 8개를 여러 방향으로 날려 보냅니다.</span><small>기본 보유</small></button>
+          <button class="shop-choice" type="button" data-ultimate="orbit" aria-pressed="false"><strong>폭풍의 궤도</strong><span>토네이도 4개가 플레이어 주위를 돌며 주변 적을 반복 공격합니다.</span><small>비용 5 · 미보유</small></button>
+          <button class="shop-choice" type="button" data-ultimate="hunt" aria-pressed="false"><strong>추적 폭풍</strong><span>큰 토네이도 6개가 적을 찾아 추적하며 강하게 공격합니다.</span><small>비용 5 · 미보유</small></button>
           <button class="shop-choice" id="healing-spring-button" type="button"><strong>회복의 샘</strong><span>코인을 내고 체력을 40 회복합니다. 재화가 남아 있으면 횟수 제한 없이 이용할 수 있습니다.</span><small>비용 3</small></button>
         </div>
         <div class="button-row"><button class="action-button" id="next-stage-button" type="button">상점 종료 · 다음 스테이지</button><button class="action-button action-button--quiet" id="skip-shop-button" type="button">구매 없이 계속</button><button class="action-button action-button--quiet" id="boss-shortcut-button" type="button">보스전 바로 가기</button></div>
@@ -912,10 +914,12 @@
         dashDirection: new THREE.Vector3(),
         invulnerable: 0,
         timeStopTimer: 0,
+        ultimateCooldown: 0,
+        ultimateMode: "radial",
+        ultimateModes: { radial: true, orbit: false, hunt: false },
         weaponCooldown: 0,
         swingTime: 0,
         swingDuration: 0.3,
-        swingHeavy: false,
       };
       camera.position.copy(player.position);
       scene.add(camera);
@@ -1058,9 +1062,6 @@
         vitality: { cost: 4, max: 1 },
         weaken: { cost: 3, max: 1 },
         fracture: { cost: 4, max: 1 },
-        hurricaneCount: { cost: 5, max: 2 },
-        hurricaneDamage: { cost: 4, max: 3 },
-        hurricaneCooldown: { cost: 4, max: 3 },
       };
       const upgradeLevels = Object.fromEntries(Object.keys(upgradeOptions).map((upgrade) => [upgrade, 0]));
 
@@ -1071,7 +1072,7 @@
         targetBox: $("#target-box"), targetName: $("#target-name"), targetHealth: $("#target-health"),
         targetFill: $("#target-fill"), shopCurrency: $("#shop-currency"),
         healingSpring: $("#healing-spring-button"),
-        healCharges: $("#heal-charges"),
+        healCharges: $("#heal-charges"), ultimateCooldown: $("#ultimate-cooldown"),
         debugPanel: $("#debug-panel"), debugPosition: $("#debug-position"),
         debugEnemies: $("#debug-enemies"), debugState: $("#debug-state"), debugScore: $("#debug-score"),
       };
@@ -1104,6 +1105,20 @@
             ? "최대 강화"
             : `비용 ${option.cost} · ${level}/${option.max}`;
         });
+        document.querySelectorAll("[data-ultimate]").forEach((button) => {
+          const mode = button.dataset.ultimate;
+          const unlocked = player.ultimateModes[mode];
+          const selected = player.ultimateMode === mode;
+          button.classList.toggle("is-selected", selected);
+          button.setAttribute("aria-pressed", String(selected));
+          button.disabled = !unlocked && currency < 5;
+          button.querySelector("small").textContent = selected
+            ? "현재 선택"
+            : unlocked ? "보유 · 선택 가능" : "비용 5 · 미보유";
+        });
+        dom.ultimateCooldown.textContent = player.ultimateCooldown > 0
+          ? `${Math.ceil(player.ultimateCooldown)}초`
+          : "사용 가능";
         dom.healingSpring.disabled = currency < 3 || player.health >= player.maxHealth;
       }
 
@@ -1294,6 +1309,7 @@
         enemy.attackCooldown = 2.8;
         enemy.ultimateCooldown = 1.2;
         enemy.chargeCooldown = 7;
+        enemy.rangedPatternCooldown = 3 + Math.random() * 2;
         enemy.timeStopCooldown = 12;
         enemy.bossState = "ground";
         enemy.bossStateTimer = 0;
@@ -1335,6 +1351,7 @@
         enemy.attackCooldown = 2.8;
         enemy.ultimateCooldown = 8;
         enemy.chargeCooldown = 7;
+        enemy.rangedPatternCooldown = 3 + Math.random() * 2;
         enemy.timeStopCooldown = 12;
         enemy.bossState = "ground";
         enemy.bossStateTimer = 0;
@@ -1600,7 +1617,7 @@
         return true;
       }
 
-      function warnBossCharge(enemy, start, end) {
+      function warnBossCharge(enemy, start, end, quick = false) {
         const length = start.distanceTo(end);
         const warning = createBossTelegraph(end, enemy.enraged ? 3.2 : 2.8);
         const lane = new THREE.Mesh(
@@ -1616,7 +1633,7 @@
           point: end.clone(),
           radius: enemy.enraged ? 3.2 : 2.8,
           damage: enemy.enraged ? 55 : 42,
-          duration: enemy.enraged ? 0.95 : 1.35,
+          duration: quick ? 0.35 : enemy.enraged ? 0.95 : 1.35,
         };
         enemy.bossState = "chargeWindup";
         enemy.bossStateTimer = enemy.warning.duration;
@@ -1753,7 +1770,7 @@
 
       function createEnemy(type, bossModel = "draco") {
         const isBoss = type === "boss";
-        const bossHealth = bossModel === "dummy" ? 2500 : 3500;
+        const bossHealth = bossModel === "dummy" ? 5000 : 7000;
         const enemy = {
           type,
           bossModel: isBoss ? bossModel : null,
@@ -1824,9 +1841,9 @@
         player.health = player.maxHealth = 100;
         player.damage = 48;
         player.damageScale = 1;
-        player.hurricaneCount = 1;
-        player.hurricaneDamageScale = 1;
-        player.hurricaneCooldownScale = 1;
+        player.ultimateCooldown = 0;
+        player.ultimateMode = "radial";
+        player.ultimateModes = { radial: true, orbit: false, hunt: false };
         Object.keys(upgradeLevels).forEach((upgrade) => { upgradeLevels[upgrade] = 0; });
         player.speed = 8.2;
         player.position.set(0, 1.68, 0);
@@ -1983,7 +2000,7 @@
         return new THREE.ShapeGeometry(shape);
       }
 
-      function playPlayerAttackEffect(stageIndex, direction, damage, onComplete = null) {
+      function playPlayerAttackEffect(stageIndex, direction, damage) {
         const template = playerAttackTemplates[stageIndex];
         const group = new THREE.Group();
         let mixer = null;
@@ -2024,7 +2041,6 @@
           mixer,
           duration,
           elapsed: 0,
-          onComplete,
           damage,
           hitEnemies: new Set(),
         });
@@ -2047,7 +2063,6 @@
 
           scene.remove(effect.group);
           playerAttackEffects.splice(index, 1);
-          effect.onComplete?.();
         }
       }
 
@@ -2067,28 +2082,11 @@
         const attackEffectIndex = combo === 1 ? 0 : combo === 2 ? 1 : 3;
         const damage = player.damage * player.damageScale
           * (combo === 3 ? 1.7 : combo === 2 ? 1.15 : 0.8);
-        playPlayerAttackEffect(
-          attackEffectIndex,
-          direction,
-          damage,
-          combo === 2
-            ? () => playPlayerAttackEffect(2, direction, player.damage * player.damageScale * 0.55)
-            : null,
-        );
+        playPlayerAttackEffect(attackEffectIndex, direction, damage);
       }
 
-      function launchSlashProjectile(yawOffset = 0) {
-        const projectileYaw = yaw + yawOffset;
-        const direction = new THREE.Vector3(
-          -Math.sin(projectileYaw) * Math.cos(pitch),
-          Math.sin(pitch),
-          -Math.cos(projectileYaw) * Math.cos(pitch),
-        ).normalize();
-        const right = new THREE.Vector3(Math.cos(projectileYaw), 0, -Math.sin(projectileYaw));
-        const origin = player.position.clone()
-          .addScaledVector(direction, 1.2)
-          .addScaledVector(right, 0.34)
-          .add(new THREE.Vector3(0, -0.16, 0));
+      function launchUltimateTornado(direction, options) {
+        const origin = player.position.clone().addScaledVector(direction, options.offset);
         const mesh = new THREE.Group();
         const materials = [];
         let sharedModel = false;
@@ -2128,45 +2126,111 @@
           mesh.add(beam);
           materials.push(outerMaterial, innerMaterial, coreMaterial);
         }
+        mesh.scale.setScalar(options.scale);
         mesh.position.copy(origin);
-        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction.clone().normalize());
         scene.add(mesh);
         slashProjectiles.push({
           mesh,
-          velocity: direction.multiplyScalar(22),
-          damage: player.damage * player.damageScale * player.hurricaneDamageScale * 1.6,
+          velocity: direction.clone().normalize().multiplyScalar(options.speed),
+          damage: options.damage,
           distance: 0,
-          maxDistance: 29,
-          life: 29 / 22,
-          hitEnemies: new Set(),
+          maxDistance: options.speed * options.duration,
+          life: options.duration,
+          age: 0,
+          mode: options.mode,
+          orbitAngle: options.orbitAngle ?? 0,
+          orbitRadius: options.orbitRadius ?? 0,
+          angularSpeed: options.angularSpeed ?? 0,
+          hitRadius: options.hitRadius,
+          hitEnemies: options.mode === "orbit" ? new Map() : new Set(),
           materials,
           sharedModel,
         });
       }
 
+      function castUltimate() {
+        if (state !== "playing" || player.timeStopTimer > 0 || player.ultimateCooldown > 0) return;
+        player.ultimateCooldown = 60;
+        const count = player.ultimateMode === "radial" ? 8 : player.ultimateMode === "orbit" ? 4 : 6;
+        for (let index = 0; index < count; index += 1) {
+          const angle = yaw + (index / count) * Math.PI * 2;
+          const direction = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+          if (player.ultimateMode === "radial") {
+            launchUltimateTornado(direction, {
+              mode: "radial", offset: 1.8, scale: 2.25, speed: 10, duration: 3.8,
+              damage: player.damage * player.damageScale * 1.8, hitRadius: 4.8,
+            });
+          } else if (player.ultimateMode === "orbit") {
+            launchUltimateTornado(direction, {
+              mode: "orbit", offset: 0, scale: 1.65, speed: 0, duration: 7,
+              damage: player.damage * player.damageScale * 0.42, hitRadius: 3.8,
+              orbitAngle: angle, orbitRadius: 5.4, angularSpeed: 2.1,
+            });
+          } else {
+            launchUltimateTornado(direction, {
+              mode: "hunt", offset: 2, scale: 1.9, speed: 13, duration: 5.2,
+              damage: player.damage * player.damageScale * 1.55, hitRadius: 3.9,
+            });
+          }
+        }
+        updateHud();
+      }
+
       function updateSlashProjectiles(delta) {
         for (let index = slashProjectiles.length - 1; index >= 0; index -= 1) {
           const projectile = slashProjectiles[index];
-          const step = projectile.velocity.length() * delta;
-          projectile.mesh.position.addScaledVector(projectile.velocity, delta);
-          projectile.mesh.userData.animationMixer?.update(delta);
-          if (projectile.sharedModel) {
-            if (projectile.life < 0.18) projectile.mesh.scale.setScalar(Math.max(0.01, projectile.life / 0.18));
-          }
-          projectile.distance += step;
           projectile.life -= delta;
+          projectile.age += delta;
+          projectile.mesh.userData.animationMixer?.update(delta);
+          if (projectile.mode === "orbit") {
+            projectile.orbitAngle += projectile.angularSpeed * delta;
+            projectile.mesh.position.set(
+              player.position.x + Math.cos(projectile.orbitAngle) * projectile.orbitRadius,
+              player.position.y - 0.3,
+              player.position.z + Math.sin(projectile.orbitAngle) * projectile.orbitRadius,
+            );
+            projectile.mesh.rotation.y += delta * 2.4;
+          } else {
+            if (projectile.mode === "hunt") {
+              const target = enemies
+                .filter((enemy) => !projectile.hitEnemies.has(enemy))
+                .sort((first, second) =>
+                  first.group.position.distanceToSquared(projectile.mesh.position)
+                  - second.group.position.distanceToSquared(projectile.mesh.position))[0];
+              if (target) {
+                projectile.velocity.lerp(
+                  target.group.position.clone().sub(projectile.mesh.position).normalize().multiplyScalar(13),
+                  Math.min(1, delta * 1.8),
+                );
+                projectile.mesh.quaternion.setFromUnitVectors(
+                  new THREE.Vector3(0, 0, 1),
+                  projectile.velocity.clone().normalize(),
+                );
+              }
+            }
+            const step = projectile.velocity.length() * delta;
+            projectile.mesh.position.addScaledVector(projectile.velocity, delta);
+            projectile.distance += step;
+          }
           const fade = Math.min(1, projectile.life / 0.18);
           projectile.materials.forEach((material) => { material.opacity = (material.userData.baseOpacity ?? 1) * fade; });
 
           [...enemies].forEach((enemy) => {
-            if (projectile.hitEnemies.has(enemy)) return;
-            if (enemy.group.position.distanceTo(projectile.mesh.position) < (projectile.hitRadius ?? 2.55)) {
+            const distance = enemy.group.position.distanceTo(projectile.mesh.position);
+            if (distance >= projectile.hitRadius) return;
+            if (projectile.mode === "orbit") {
+              const lastHit = projectile.hitEnemies.get(enemy) ?? -Infinity;
+              if (projectile.age - lastHit < 0.65) return;
+              projectile.hitEnemies.set(enemy, projectile.age);
+              damageEnemy(enemy, projectile.damage);
+            } else if (!projectile.hitEnemies.has(enemy)) {
               projectile.hitEnemies.add(enemy);
               damageEnemy(enemy, projectile.damage);
             }
           });
 
-          if (projectile.life <= 0 || projectile.distance >= projectile.maxDistance) {
+          if (projectile.life <= 0 || projectile.mode !== "orbit" && projectile.distance >= projectile.maxDistance) {
             disposeSlashProjectile(projectile);
             slashProjectiles.splice(index, 1);
           }
@@ -2248,9 +2312,11 @@
 
       function fireNosiRadial(enemy) {
         const origin = enemy.group.position.clone().add(new THREE.Vector3(0, 3.4, 0));
+        const forward = player.position.clone().sub(origin).setY(0).normalize();
         enemy.radialProjectiles = Array.from({ length: 3 }, (_, index) => {
-          const angle = enemy.age + (index * Math.PI * 2) / 3;
-          const target = origin.clone().add(new THREE.Vector3(Math.cos(angle) * 32, 0, Math.sin(angle) * 32));
+          const angle = (index - 1) * 0.28;
+          const direction = forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+          const target = origin.clone().addScaledVector(direction, 32);
           target.y = player.position.y;
           const projectile = createNosiProjectile(origin, target);
           projectile.userData.velocity.setLength(18);
@@ -2273,40 +2339,67 @@
           scene.remove(enemy.projectile);
           enemy.projectile = null;
         }
+        enemy.burstProjectiles?.forEach((projectile) => scene.remove(projectile));
+        enemy.burstProjectiles = [];
         enemy.radialProjectiles?.forEach((projectile) => scene.remove(projectile));
         enemy.radialProjectiles = [];
       }
 
-      function queueEnemyBurst(enemy, count, damage, explosive = false) {
+      function queueEnemyBurst(enemy, count, damage, explosive = false, options = {}) {
         enemy.burstRemaining = count;
+        enemy.burstInitialCount = count;
+        enemy.burstShotIndex = 0;
         enemy.burstTimer = 0;
         enemy.burstDamage = damage;
         enemy.burstExplosive = explosive;
+        enemy.burstInterval = options.interval;
+        enemy.burstSpreadAngle = options.spreadAngle ?? 0;
+        enemy.burstSpeed = options.speed;
       }
 
       function updateEnemyBurst(enemy, delta, originHeight) {
-        if (enemy.burstRemaining <= 0 || enemy.projectile) return;
+        if (enemy.burstRemaining <= 0) return;
         enemy.burstTimer -= delta;
         if (enemy.burstTimer > 0) return;
         const origin = enemy.group.position.clone().add(new THREE.Vector3(0, originHeight, 0));
         const dracoShot = enemy.type === "boss" && enemy.bossModel === "draco";
         const hasDracoModel = dracoShot && dracoProjectileTemplate;
-        enemy.projectile = createNosiProjectile(
+        const direction = player.position.clone().sub(origin).normalize();
+        const spreadProgress = enemy.burstInitialCount > 1
+          ? enemy.burstShotIndex / (enemy.burstInitialCount - 1) - 0.5
+          : 0;
+        direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), spreadProgress * enemy.burstSpreadAngle);
+        const target = enemy.burstSpreadAngle
+          ? origin.clone().addScaledVector(direction, 32)
+          : player.position.clone();
+        const projectile = createNosiProjectile(
           origin,
-          player.position.clone(),
+          target,
           hasDracoModel ? dracoProjectileTemplate : nosiProjectileTemplate,
           hasDracoModel ? dracoProjectileAnimations : nosiProjectileAnimations,
           hasDracoModel ? 2.8 : 9.6,
           enemy.burstExplosive,
         );
-        enemy.projectile.userData.velocity.setLength(dracoShot ? 15 : 18);
+        projectile.userData.velocity.setLength(enemy.burstSpeed ?? (dracoShot ? 15 : 18));
         const projectileDamage = Number.isFinite(enemy.burstDamage)
           ? enemy.burstDamage
           : Number.isFinite(enemy.attackDamage) ? enemy.attackDamage : 14;
-        enemy.projectile.userData.damage = projectileDamage;
+        projectile.userData.damage = projectileDamage;
+        enemy.burstProjectiles ??= [];
+        enemy.burstProjectiles.push(projectile);
         enemy.attackDamage = projectileDamage;
         enemy.burstRemaining -= 1;
-        enemy.burstTimer = dracoShot ? 0.34 : 0.2;
+        enemy.burstShotIndex += 1;
+        enemy.burstTimer = enemy.burstInterval ?? (dracoShot ? 0.34 : 0.2);
+      }
+
+      function updateBurstProjectiles(enemy, delta) {
+        if (!enemy.burstProjectiles) return;
+        for (let index = enemy.burstProjectiles.length - 1; index >= 0; index -= 1) {
+          if (advanceEnemyProjectile(enemy, enemy.burstProjectiles[index], delta)) {
+            enemy.burstProjectiles.splice(index, 1);
+          }
+        }
       }
 
       function updateBoss(enemy, delta, distance, dirX, dirZ) {
@@ -2319,6 +2412,7 @@
         }
         updateEnemyProjectile(enemy, delta);
         updateEnemyBurst(enemy, delta, 6.4);
+        updateBurstProjectiles(enemy, delta);
         updateDracoSkyRifts(enemy, delta);
 
         if (enemy.bossModel === "dummy") {
@@ -2410,11 +2504,13 @@
           enemy.group.position.y = enemy.flightHeight;
           enemy.bossStateTimer -= delta;
           enemy.flightShotCooldown -= delta;
-          if (enemy.flightShotCooldown <= 0 && enemy.burstRemaining <= 0 && !enemy.projectile) {
+          if (enemy.flightShotCooldown <= 0 && enemy.burstRemaining <= 0
+              && !(enemy.burstProjectiles?.length) && !enemy.projectile) {
             queueEnemyBurst(enemy, enemy.enraged ? 4 : 3, enemy.enraged ? 34 : 24, true);
             enemy.flightShotCooldown = enemy.enraged ? 3.2 : 4.2;
           }
-          if (enemy.bossStateTimer <= 0 && enemy.burstRemaining <= 0 && !enemy.projectile) {
+          if (enemy.bossStateTimer <= 0 && enemy.burstRemaining <= 0
+              && !(enemy.burstProjectiles?.length) && !enemy.projectile) {
             enemy.bossState = "flightDescend";
             enemy.bossStateTimer = 1.6;
           }
@@ -2458,6 +2554,15 @@
           }
           if (enemy.bossStateTimer <= 0) {
             removeBossTelegraph(enemy);
+            if (enemy.chargeChainRemaining > 0) {
+              enemy.chargeChainRemaining -= 1;
+              const start = enemy.group.position.clone();
+              const direction = player.position.clone().sub(start).setY(0).normalize();
+              const end = start.clone().addScaledVector(direction, Math.min(start.distanceTo(player.position) + 2.5, 24));
+              if (Math.hypot(end.x, end.z) > 31) end.setLength(31);
+              warnBossCharge(enemy, start, end, true);
+              return;
+            }
             enemy.bossState = "ground";
             enemy.chargeCooldown = enemy.enraged ? 5 : 10;
             enemy.attackCooldown = enemy.enraged ? 0.6 : 1.2;
@@ -2480,6 +2585,7 @@
         const cooldownRate = enemy.enraged ? 1.55 : 1;
         enemy.ultimateCooldown -= delta * cooldownRate;
         enemy.chargeCooldown -= delta * cooldownRate;
+        enemy.rangedPatternCooldown -= delta * cooldownRate;
         if (enemy.bossModel === "dummy") enemy.timeStopCooldown -= delta * cooldownRate;
         enemy.attackCooldown -= delta * cooldownRate;
         if (enemy.bossModel === "draco") enemy.groundPhaseTimer -= delta * cooldownRate;
@@ -2503,11 +2609,36 @@
           const end = start.clone().addScaledVector(direction, chargeDistance);
           const endRadius = Math.hypot(end.x, end.z);
           if (endRadius > 31) end.setLength(31);
+          enemy.chargeChainRemaining = enemy.enraged ? 3 : 2;
           warnBossCharge(enemy, start, end);
           return;
         }
 
         if (enemy.bossModel === "dummy" && enemy.timeStopCooldown <= 0 && enemy.timeStopPhase === null && startTimeStopPattern(enemy)) return;
+
+        if (enemy.rangedPatternCooldown <= 0 && enemy.burstRemaining <= 0
+            && !(enemy.burstProjectiles?.length) && !enemy.projectile) {
+          if (Math.random() < 0.5) {
+            queueEnemyBurst(
+              enemy,
+              6,
+              enemy.enraged ? 14 : 10,
+              false,
+              { interval: 0.1, spreadAngle: 0.08, speed: 23 },
+            );
+          } else {
+            queueEnemyBurst(
+              enemy,
+              7,
+              enemy.enraged ? 11 : 8,
+              false,
+              { interval: 0.025, spreadAngle: 0.82, speed: 20 },
+            );
+          }
+          enemy.rangedPatternCooldown = enemy.enraged ? 5 : 8;
+          enemy.attackCooldown = enemy.enraged ? 1.8 : 2.8;
+          return;
+        }
 
         if (distance > enemy.attackRange * 0.82) {
           const step = Math.min(enemy.speed * delta, distance - enemy.attackRange * 0.72);
@@ -2580,19 +2711,11 @@
         return null;
       }
 
-      function swingSword(heavy = false) {
+      function swingSword() {
         if (state !== "playing" || player.timeStopTimer > 0 || player.weaponCooldown > 0) return;
-        player.weaponCooldown = heavy ? 1.05 * player.hurricaneCooldownScale : 0.24;
-        player.swingDuration = heavy ? 0.62 : 0.38;
+        player.weaponCooldown = 0.24;
+        player.swingDuration = 0.38;
         player.swingTime = player.swingDuration;
-        player.swingHeavy = heavy;
-        if (heavy) {
-          for (let index = 0; index < player.hurricaneCount; index += 1) {
-            const spread = (index - (player.hurricaneCount - 1) / 2) * 0.18;
-            launchSlashProjectile(spread);
-          }
-          return;
-        }
         lightComboStep = lightComboTimer > 0 ? lightComboStep % 3 + 1 : 1;
         lightComboTimer = 1.1;
         player.swingCombo = lightComboStep;
@@ -2746,7 +2869,7 @@
         const swingArc = swinging ? Math.sin(THREE.MathUtils.smoothstep(swingProgress, 0.08, 0.58) * Math.PI) : 0;
         const windup = swinging ? 1 - THREE.MathUtils.smoothstep(swingProgress, 0, 0.24) : 0;
         const followThrough = swinging ? THREE.MathUtils.smoothstep(swingProgress, 0.58, 0.94) : 0;
-        const swingPower = player.swingHeavy ? 1.15 : 0.9;
+        const swingPower = 0.9;
         const comboTilt = player.swingCombo === 3 ? 0.48 : player.swingCombo === 2 ? -0.42 : 0.18;
         sword.rotation.set(
           -0.12 - swingArc * 0.95 * swingPower,
@@ -2859,6 +2982,7 @@
 
       function updateGame(delta) {
         elapsed += delta;
+        player.ultimateCooldown = Math.max(0, player.ultimateCooldown - delta);
         spawnTimer -= delta;
         if (enemiesToSpawn > 0 && spawnTimer <= 0) {
           const spawnCount = Math.min(stage, enemiesToSpawn);
@@ -2954,9 +3078,19 @@
           }
           if (upgrade === "weaken") { enemySpeedScale *= 0.85; enemyDamageScale *= 0.85; }
           if (upgrade === "fracture") enemyHealthScale *= 0.8;
-          if (upgrade === "hurricaneCount") player.hurricaneCount += 1;
-          if (upgrade === "hurricaneDamage") player.hurricaneDamageScale *= 1.25;
-          if (upgrade === "hurricaneCooldown") player.hurricaneCooldownScale *= 0.85;
+          updateHud();
+        });
+      });
+      document.querySelectorAll("[data-ultimate]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (state !== "shop") return;
+          const mode = button.dataset.ultimate;
+          if (!player.ultimateModes[mode]) {
+            if (currency < 5) return;
+            currency -= 5;
+            player.ultimateModes[mode] = true;
+          }
+          player.ultimateMode = mode;
           updateHud();
         });
       });
@@ -2974,6 +3108,10 @@
             healFlash.classList.add("is-active");
             updateHud();
           }
+          return;
+        }
+        if (event.code === "KeyR") {
+          if (!event.repeat) castUltimate();
           return;
         }
         if (event.code === "KeyT" && !event.repeat) {
@@ -2999,7 +3137,6 @@
       });
       renderer.domElement.addEventListener("mousedown", (event) => {
         if (event.button === 0) swingSword();
-        if (event.button === 2) swingSword(true);
       });
       renderer.domElement.addEventListener("contextmenu", (event) => event.preventDefault());
       document.addEventListener("pointerlockchange", () => {
