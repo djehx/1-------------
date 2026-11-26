@@ -276,29 +276,142 @@ const entryPortals = routeDefinitions.map(({ curve }, index) => {
 const riftCore = new THREE.Group();
 riftCore.position.set(31, 0, -18);
 const coreBase = new THREE.Mesh(
-  new THREE.CylinderGeometry(2.2, 2.8, 0.85, 8),
+  new THREE.CylinderGeometry(1.65, 1.9, 0.62, 8),
   new THREE.MeshStandardMaterial({ color: 0x243b4a, metalness: 0.65, roughness: 0.32 }),
 );
-coreBase.position.y = 0.43;
-const coreCrystal = new THREE.Mesh(
-  new THREE.OctahedronGeometry(1.45, 1),
-  new THREE.MeshStandardMaterial({
-    color: 0x76f2e7,
-    emissive: 0x17bfd0,
-    emissiveIntensity: 1.8,
-    metalness: 0.25,
-    roughness: 0.18,
-  }),
-);
+coreBase.position.y = 0.31;
+const coreCrystal = new THREE.Group();
+const coreCrystalMaterial = new THREE.MeshStandardMaterial({
+  color: 0x76f2e7,
+  emissive: 0x17bfd0,
+  emissiveIntensity: 1.8,
+  metalness: 0.25,
+  roughness: 0.18,
+  flatShading: true,
+});
+const coreCrystalEdges = new THREE.LineBasicMaterial({
+  color: 0xd7fffb,
+  transparent: true,
+  opacity: 0.76,
+});
+[
+  { geometry: new THREE.CylinderGeometry(1.15, 1.15, 0.5, 8), y: 0, rotationX: 0 },
+  { geometry: new THREE.ConeGeometry(1.15, 1.2, 8), y: 0.85, rotationX: 0 },
+  { geometry: new THREE.ConeGeometry(1.15, 0.9, 8), y: -0.7, rotationX: Math.PI },
+].forEach(({ geometry, y, rotationX }) => {
+  const facet = new THREE.Mesh(geometry, coreCrystalMaterial);
+  facet.position.y = y;
+  facet.rotation.x = rotationX;
+  facet.castShadow = true;
+  facet.receiveShadow = true;
+  coreCrystal.add(facet);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), coreCrystalEdges);
+  edges.position.copy(facet.position);
+  edges.rotation.copy(facet.rotation);
+  coreCrystal.add(edges);
+});
 coreCrystal.position.y = 2.35;
-coreCrystal.castShadow = true;
 const coreRing = new THREE.Mesh(
   new THREE.TorusGeometry(2.3, 0.12, 10, 48),
   new THREE.MeshBasicMaterial({ color: 0x74e7f2, transparent: true, opacity: 0.82 }),
 );
 coreRing.rotation.x = Math.PI / 2;
 coreRing.position.y = 0.2;
-riftCore.add(coreBase, coreCrystal, coreRing);
+const coreShield = new THREE.Group();
+coreShield.position.y = 2.35;
+const coreShieldRadius = 1.55;
+const coreShieldHeight = 3.45;
+const coreShieldGeometry = new THREE.CylinderGeometry(
+  coreShieldRadius,
+  coreShieldRadius,
+  coreShieldHeight,
+  8,
+  1,
+  true,
+);
+const coreShieldFace = new THREE.Mesh(
+  coreShieldGeometry,
+  new THREE.MeshBasicMaterial({
+    color: 0x62f4eb,
+    transparent: true,
+    opacity: 0.07,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }),
+);
+const coreShieldFrame = new THREE.LineSegments(
+  new THREE.EdgesGeometry(coreShieldGeometry),
+  new THREE.LineBasicMaterial({ color: 0x9ffff8, transparent: true, opacity: 0.94 }),
+);
+coreShield.add(coreShieldFace, coreShieldFrame);
+const coreShieldDetail = new THREE.LineBasicMaterial({
+  color: 0x75fff4,
+  transparent: true,
+  opacity: 0.82,
+});
+const coreShieldLatticePoints = [];
+const coreShieldNodePoints = [];
+for (let index = 0; index < 8; index += 1) {
+  const angle = (index / 8) * Math.PI * 2;
+  const nextAngle = ((index + 1) / 8) * Math.PI * 2;
+  const previousAngle = ((index + 7) / 8) * Math.PI * 2;
+  const lower = new THREE.Vector3(
+    Math.cos(angle) * coreShieldRadius,
+    -coreShieldHeight / 2,
+    Math.sin(angle) * coreShieldRadius,
+  );
+  const upperNext = new THREE.Vector3(
+    Math.cos(nextAngle) * coreShieldRadius,
+    coreShieldHeight / 2,
+    Math.sin(nextAngle) * coreShieldRadius,
+  );
+  const upperPrevious = new THREE.Vector3(
+    Math.cos(previousAngle) * coreShieldRadius,
+    coreShieldHeight / 2,
+    Math.sin(previousAngle) * coreShieldRadius,
+  );
+  coreShieldLatticePoints.push(lower, upperNext, lower, upperPrevious);
+  coreShieldNodePoints.push(lower, new THREE.Vector3(lower.x, coreShieldHeight / 2, lower.z));
+}
+coreShield.add(new THREE.LineSegments(
+  new THREE.BufferGeometry().setFromPoints(coreShieldLatticePoints),
+  coreShieldDetail,
+));
+[-0.34, 0.34].forEach((heightScale) => {
+  const points = Array.from({ length: 8 }, (_, index) => {
+    const angle = (index / 8) * Math.PI * 2;
+    return new THREE.Vector3(
+      Math.cos(angle) * coreShieldRadius,
+      heightScale * coreShieldHeight / 2,
+      Math.sin(angle) * coreShieldRadius,
+    );
+  });
+  coreShield.add(new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(points),
+    coreShieldDetail,
+  ));
+});
+coreShield.add(new THREE.Points(
+  new THREE.BufferGeometry().setFromPoints(coreShieldNodePoints),
+  new THREE.PointsMaterial({
+    color: 0xbafff9,
+    size: 0.16,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+  }),
+));
+[-1, 1].forEach((side) => {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(coreShieldRadius, 0.045, 6, 8),
+    new THREE.MeshBasicMaterial({ color: 0x9ffff8, transparent: true, opacity: 0.95 }),
+  );
+  ring.position.y = side * coreShieldHeight / 2;
+  ring.rotation.x = Math.PI / 2;
+  coreShield.add(ring);
+});
+riftCore.add(coreBase, coreCrystal, coreRing, coreShield);
+riftCore.scale.setScalar(1.8);
 scene.add(riftCore);
 
 function createMiniCastle(x, z, scale = 1, style = 0) {
@@ -313,7 +426,7 @@ function createMiniCastle(x, z, scale = 1, style = 0) {
   const darkStone = new THREE.MeshStandardMaterial({ color: palette.trim, roughness: 0.86 });
   const roof = new THREE.MeshStandardMaterial({ color: palette.roof, roughness: 0.72 });
   const doorMaterial = new THREE.MeshStandardMaterial({ color: palette.door, roughness: 0.78 });
-  const platform = new THREE.Mesh(new THREE.BoxGeometry(16, 0.45, 13), darkStone);
+  const platform = new THREE.Mesh(new THREE.BoxGeometry(18, 0.45, 14.2), darkStone);
   platform.position.y = 0.23;
   platform.receiveShadow = true;
   castle.add(platform);
@@ -341,38 +454,40 @@ function createMiniCastle(x, z, scale = 1, style = 0) {
   gateArch.rotation.z = Math.PI;
   castle.add(gateArch);
 
-  const cornerTowers = [[-7, -5.5], [7, -5.5], [-7, 5.5], [7, 5.5]];
-  cornerTowers.forEach(([towerX, towerZ], index) => {
-    const turret = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.28, 5.1 + (index % 2) * 0.7, 8), stone);
-    turret.position.set(towerX, 2.85 + (index % 2) * 0.35, towerZ);
+  const wallTop = 4.05;
+  const turretHeight = 2.55;
+  const cornerTowers = [[-7.6, -6.1], [7.6, -6.1], [-7.6, 6.1], [7.6, 6.1]];
+  cornerTowers.forEach(([towerX, towerZ]) => {
+    const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 0.98, turretHeight, 8), stone);
+    turret.position.set(towerX, wallTop + turretHeight / 2, towerZ);
     turret.castShadow = true;
+    const roofHeight = style === 1 ? 2 : 1.55;
     const roofTop = new THREE.Mesh(
-      new THREE.ConeGeometry(style === 1 ? 1.55 : 1.35, style === 1 ? 2.2 : 1.65, style === 2 ? 5 : 8),
+      new THREE.ConeGeometry(style === 1 ? 1.35 : 1.2, roofHeight, style === 2 ? 5 : 8),
       roof,
     );
-    roofTop.position.set(towerX, 5.9 + (index % 2) * 0.35, towerZ);
+    roofTop.position.set(towerX, wallTop + turretHeight + roofHeight / 2, towerZ);
     roofTop.castShadow = true;
-    const merlon = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.45, 2.15), darkStone);
-    merlon.position.set(towerX, 5.35 + (index % 2) * 0.35, towerZ);
-    castle.add(turret, roofTop, merlon);
+    castle.add(turret, roofTop);
   });
 
   const keep = new THREE.Mesh(new THREE.BoxGeometry(6.6, 5.2, 5.8), stone);
-  keep.position.set(0, 2.95, -1.5);
+  keep.position.set(0, 3.05, -1.5);
   keep.castShadow = true;
   keep.receiveShadow = true;
+  const keepRoofHeight = style === 1 ? 4.8 : 3.6;
   const keepRoof = new THREE.Mesh(
-    new THREE.ConeGeometry(style === 1 ? 4.7 : 4.2, style === 1 ? 4.8 : 3.6, style === 2 ? 5 : 4),
+    new THREE.ConeGeometry(style === 1 ? 4.7 : 4.2, keepRoofHeight, style === 2 ? 5 : 4),
     roof,
   );
-  keepRoof.position.set(0, 7.3, -1.5);
+  keepRoof.position.set(0, 5.65 + keepRoofHeight / 2, -1.5);
   keepRoof.rotation.y = Math.PI / 4;
   keepRoof.castShadow = true;
   castle.add(keep, keepRoof);
 
   for (let index = 0; index < 7; index += 1) {
     const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.65, 0.85), darkStone);
-    merlon.position.set(-6.3 + index * 2.1, 4.25, -6.12);
+    merlon.position.set(-6.3 + index * 2.1, wallTop + 0.325, -6.12);
     castle.add(merlon);
   }
   castle.scale.setScalar(scale);
@@ -855,6 +970,36 @@ function buildTower(typeName, x, z) {
   halo.rotation.x = Math.PI / 2;
   if (typeName === "storm") halo.rotation.y = Math.PI / 3;
   group.add(halo);
+  const shield = new THREE.Group();
+  shield.position.y = core.position.y;
+  const shieldRadius = 1.48;
+  const shieldHeight = 3.15;
+  const shieldGeometry = new THREE.CylinderGeometry(shieldRadius, shieldRadius, shieldHeight, 8, 1, true);
+  const shieldFace = new THREE.Mesh(
+    shieldGeometry,
+    new THREE.MeshBasicMaterial({
+      color: type.color,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  const shieldFrame = new THREE.LineSegments(
+    new THREE.EdgesGeometry(shieldGeometry),
+    new THREE.LineBasicMaterial({ color: type.color, transparent: true, opacity: 0.9 }),
+  );
+  shield.add(shieldFace, shieldFrame);
+  [-1, 1].forEach((side) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(shieldRadius, 0.045, 6, 8),
+      new THREE.MeshBasicMaterial({ color: type.color, transparent: true, opacity: 0.95 }),
+    );
+    ring.position.y = side * shieldHeight / 2;
+    ring.rotation.x = Math.PI / 2;
+    shield.add(ring);
+  });
+  group.add(shield);
   const evolutionHalo = new THREE.Mesh(
     new THREE.TorusGeometry(1.65, 0.1, 8, 36),
     new THREE.MeshBasicMaterial({ color: 0xffe87b, transparent: true, opacity: 0.9 }),
@@ -907,6 +1052,9 @@ function buildTower(typeName, x, z) {
     core,
     coreScale: core.scale.clone(),
     halo,
+    shield,
+    shieldFace,
+    shieldFrame,
     evolutionHalo,
     unstableAura,
     unstableLeft: 0,
@@ -928,6 +1076,7 @@ function buildTower(typeName, x, z) {
   };
   group.userData.tower = tower;
   const nonInteractiveMeshes = new Set([evolutionHalo, ...unstableAura.children]);
+  shield.traverse((object) => { if (object.isMesh) nonInteractiveMeshes.add(object); });
   group.traverse((object) => {
     if (object.isMesh && object !== rangeRing && object !== placementRing && !nonInteractiveMeshes.has(object)) towerMeshes.push(object);
   });
@@ -985,6 +1134,8 @@ function upgradeSelectedTower() {
     tower.splash += evolution.splash;
     tower.slow += evolution.slow ?? 0;
     tower.core.material.emissiveIntensity += 1.25;
+    tower.shieldFace.material.opacity = 0.18;
+    tower.shieldFrame.material.color.setHex(0xffe87b);
     tower.evolutionHalo.visible = true;
     tower.evolutionHalo.rotation.y = Math.PI / 5;
     setStatus(`${tower.name} 진화! ${evolution.name} 고유 효과가 활성화되었습니다.`);
@@ -1035,6 +1186,22 @@ function createEnemy(isBoss = false, spawnEntryIndex = 0, isMidBoss = false) {
     );
   model.rotation.y = facingOffset;
   group.add(model);
+  let bossShield = null;
+  if (isLargeEnemy) {
+    bossShield = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(isBoss ? 3.4 : 2.8, 1),
+      new THREE.MeshBasicMaterial({
+        color: isBoss ? 0xb75cff : 0x75d9f0,
+        transparent: true,
+        opacity: 0.36,
+        wireframe: true,
+        depthWrite: false,
+      }),
+    );
+    bossShield.position.y = isBoss ? 2.9 : 2.4;
+    bossShield.visible = false;
+    group.add(bossShield);
+  }
   let mixer = null;
   if (template?.animations.length) {
     mixer = new THREE.AnimationMixer(model);
@@ -1064,6 +1231,7 @@ function createEnemy(isBoss = false, spawnEntryIndex = 0, isMidBoss = false) {
     group,
     mixer,
     hpFill,
+    bossShield,
     facingOffset,
     health: maxHealth,
     maxHealth,
@@ -1075,6 +1243,9 @@ function createEnemy(isBoss = false, spawnEntryIndex = 0, isMidBoss = false) {
     isMidBoss,
     skillCooldown: isBoss ? 6.5 : isMidBoss ? 8.5 : Infinity,
     skillCooldownLeft: isBoss ? 6.5 : isMidBoss ? 8.5 : Infinity,
+    bossSkillIndex: 0,
+    speedBoostLeft: 0,
+    guardLeft: 0,
     dead: false,
     reward: isBoss ? 180 : isMidBoss ? 90 : 16 + wave * 2,
   };
@@ -1177,28 +1348,59 @@ function showBossWarning(isFinalBoss) {
 }
 
 function applyBossSkill(enemy) {
-  const candidates = towers
-    .map((tower) => ({
-      tower,
-      distance: Math.hypot(
-        tower.group.position.x - enemy.group.position.x,
-        tower.group.position.z - enemy.group.position.z,
-      ),
-    }))
-    .sort((first, second) => first.distance - second.distance);
-  const affected = candidates.filter(({ distance }) => distance <= 22).slice(0, enemy.isBoss ? 3 : 2);
-  if (!affected.length && candidates.length) affected.push(candidates[0]);
-  const duration = enemy.isBoss ? 3.8 : 2.8;
-  affected.forEach(({ tower }) => {
-    tower.unstableLeft = Math.max(tower.unstableLeft, duration);
-    tower.unstableAura.visible = true;
-  });
-  screenShakeLeft = enemy.isBoss ? 0.85 : 0.62;
-  screenShakeStrength = enemy.isBoss ? 1.15 : 0.72;
-  createImpact(enemy.group.position, 0xc36bff, enemy.isBoss ? 4.2 : 3, "storm");
-  setStatus(affected.length
-    ? `${enemy.isBoss ? "계층주" : "중간 보스"}의 균열 파동! ${affected.length}개 타워가 ${duration.toFixed(2)}초간 불안정해 공격을 멈춥니다.`
-    : `${enemy.isBoss ? "계층주" : "중간 보스"}가 균열 파동을 일으켰습니다!`);
+  const skills = enemy.isBoss ? ["disrupt", "rush", "guard"] : ["disrupt", "recover"];
+  const skill = skills[enemy.bossSkillIndex % skills.length];
+  enemy.bossSkillIndex += 1;
+  const bossName = enemy.isBoss ? "계층주" : "중간 보스";
+
+  if (skill === "disrupt") {
+    const candidates = towers
+      .map((tower) => ({
+        tower,
+        distance: Math.hypot(
+          tower.group.position.x - enemy.group.position.x,
+          tower.group.position.z - enemy.group.position.z,
+        ),
+      }))
+      .sort((first, second) => first.distance - second.distance);
+    const affected = candidates.filter(({ distance }) => distance <= 22).slice(0, enemy.isBoss ? 3 : 2);
+    if (!affected.length && candidates.length) affected.push(candidates[0]);
+    const duration = enemy.isBoss ? 3.8 : 2.8;
+    affected.forEach(({ tower }) => {
+      tower.unstableLeft = Math.max(tower.unstableLeft, duration);
+      tower.unstableAura.visible = true;
+    });
+    screenShakeLeft = enemy.isBoss ? 0.85 : 0.62;
+    screenShakeStrength = enemy.isBoss ? 1.15 : 0.72;
+    createImpact(enemy.group.position, 0xc36bff, enemy.isBoss ? 4.2 : 3, "storm");
+    setStatus(affected.length
+      ? `${bossName}의 균열 파동! ${affected.length}개 타워가 ${duration.toFixed(1)}초간 불안정해집니다.`
+      : `${bossName}가 균열 파동을 일으켰습니다!`);
+    return;
+  }
+
+  if (skill === "recover") {
+    const recovered = Math.ceil(enemy.maxHealth * 0.14);
+    enemy.health = Math.min(enemy.maxHealth, enemy.health + recovered);
+    updateBossHealth(enemy);
+    createImpact(enemy.group.position, 0x74f0d1, 2.8, "frost");
+    setStatus(`${bossName}의 균열 재생! 체력을 ${recovered.toLocaleString("ko-KR")} 회복했습니다.`);
+    return;
+  }
+
+  if (skill === "rush") {
+    enemy.speedBoostLeft = 2.8;
+    screenShakeLeft = 0.72;
+    screenShakeStrength = 0.9;
+    createImpact(enemy.group.position, 0xff794f, 4.1, "storm");
+    setStatus("계층주의 차원 돌진! 잠시 이동 속도가 크게 증가합니다.");
+    return;
+  }
+
+  enemy.guardLeft = 3.8;
+  enemy.bossShield.visible = true;
+  createImpact(enemy.group.position, 0x9d55ff, 3.8, "storm");
+  setStatus("계층주의 팔면 보호막! 잠시 받는 피해가 감소합니다.");
 }
 
 function fireFrostWave(tower, target) {
@@ -1274,7 +1476,8 @@ function fireTower(tower, target) {
 
 function damageEnemy(enemy, damage) {
   if (enemy.dead) return;
-  enemy.health = Math.max(0, enemy.health - damage);
+  const damageMultiplier = enemy.guardLeft > 0 ? 0.42 : 1;
+  enemy.health = Math.max(0, enemy.health - damage * damageMultiplier);
   if (enemy.hpFill) {
     enemy.hpFill.scale.x = Math.max(0.001, enemy.health / enemy.maxHealth);
     enemy.hpFill.position.x = -2.15 * (1 - enemy.health / enemy.maxHealth) / 2;
@@ -1389,7 +1592,10 @@ function updateEnemies(delta) {
   for (const enemy of [...enemies]) {
     enemy.mixer?.update(delta);
     enemy.slowLeft = Math.max(0, enemy.slowLeft - delta);
-    const speedScale = enemy.slowLeft > 0 ? 0.48 : 1;
+    enemy.speedBoostLeft = Math.max(0, enemy.speedBoostLeft - delta);
+    enemy.guardLeft = Math.max(0, enemy.guardLeft - delta);
+    if (enemy.bossShield) enemy.bossShield.visible = enemy.guardLeft > 0;
+    const speedScale = (enemy.slowLeft > 0 ? 0.48 : 1) * (enemy.speedBoostLeft > 0 ? 1.85 : 1);
     const route = routeDefinitions[enemy.routeIndex];
     enemy.progress += (enemy.speed * speedScale * delta) / route.length;
     if (enemy.progress >= 1) {
@@ -1640,6 +1846,7 @@ function frame(timestamp) {
   for (const tower of towers) {
     tower.core.rotation.y += delta * 0.8;
     tower.halo.rotation.z -= delta * 0.55;
+    tower.shield.rotation.y += delta * 0.18;
     if (tower.evolved) tower.evolutionHalo.rotation.z += delta * 0.7;
   }
   entryPortals.forEach((portal, index) => {
@@ -1653,6 +1860,7 @@ function frame(timestamp) {
   });
   coreCrystal.rotation.y += delta * 0.42;
   coreRing.rotation.z += delta * 0.26;
+  coreShield.rotation.y += delta * 0.12;
   let shakeX = 0;
   let shakeY = 0;
   let shakeZ = 0;

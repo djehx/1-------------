@@ -134,6 +134,8 @@
     .stat-value { color: #f3f0e7; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .stat-value--score { color: #e5be72; }
     .heal-charge { display: flex; justify-content: space-between; margin-top: 10px; color: #b6c4b8; font-size: 11px; }
+    .heal-charge__label { display: grid; gap: 3px; }
+    .heal-charge__timer { color: #9af0b2; font-size: 10px; }
     .heal-charge strong { color: #9af0b2; font-variant-numeric: tabular-nums; }
 
     .target-box {
@@ -391,7 +393,7 @@
           <div><span class="stat-label">남은 적</span><strong class="stat-value" id="remaining-value">10</strong></div>
           <div><span class="stat-label">재화</span><strong class="stat-value" id="currency-value">0</strong></div>
         </div>
-        <div class="heal-charge"><span><kbd>Q</kbd> 체력 30 회복</span><strong><span id="heal-charges">2</span> / 2</strong></div>
+        <div class="heal-charge"><span class="heal-charge__label"><span><kbd>Q</kbd> 체력 30 회복</span><small class="heal-charge__timer" id="heal-recharge-timer">충전 완료</small></span><strong><span id="heal-charges">2</span> / 2</strong></div>
         <div class="heal-charge"><span><kbd>R</kbd> 궁극기</span><strong id="ultimate-cooldown">사용 가능</strong></div>
       </div>
 
@@ -431,7 +433,7 @@
           <div><kbd>WASD</kbd><span>이동과 회피</span></div>
           <div><kbd>MOUSE</kbd><span>시야 조준</span></div>
           <div><kbd>LEFT CLICK</kbd><span>1타·2타 연속 검격 · 3타 X 피니시</span></div>
-          <div><kbd>R</kbd><span>궁극기 · 60초 재사용 대기시간</span></div>
+          <div><kbd>R</kbd><span>궁극기 · 30초 재사용 대기시간</span></div>
           <div><kbd>SHIFT</kbd><span>방향 돌진</span></div>
           <div><kbd>SPACE</kbd><span>점프, 공중에서 2단 점프</span></div>
           <div><kbd>ESC</kbd><span>일시 정지</span></div>
@@ -464,6 +466,8 @@
           <button class="shop-choice" type="button" data-upgrade="vitality"><strong>응급 회복</strong><span>체력을 35 회복하고 최대 체력을 10 늘립니다.</span><small>비용 4</small></button>
           <button class="shop-choice" type="button" data-upgrade="weaken"><strong>노즐 약화</strong><span>적의 이동 속도와 공격력이 15% 감소합니다.</span><small>비용 3</small></button>
           <button class="shop-choice" type="button" data-upgrade="fracture"><strong>균열의 표식</strong><span>적의 체력이 20% 감소합니다.</span><small>비용 4</small></button>
+          <button class="shop-choice" type="button" data-upgrade="guard"><strong>균열 방벽</strong><span>플레이어가 받는 피해가 20% 감소합니다.</span><small>비용 3</small></button>
+          <button class="shop-choice" type="button" data-upgrade="bossbane"><strong>차원 사냥꾼</strong><span>보스에게 주는 피해가 35% 증가합니다.</span><small>비용 4</small></button>
           <button class="shop-choice" type="button" data-ultimate="radial" aria-pressed="true"><strong>폭풍의 탄생</strong><span>기본 궁극기. 거대한 토네이도 8개를 여러 방향으로 날려 보냅니다.</span><small>기본 보유</small></button>
           <button class="shop-choice" type="button" data-ultimate="orbit" aria-pressed="false"><strong>폭풍의 궤도</strong><span>토네이도 4개가 플레이어 주위를 돌며 주변 적을 반복 공격합니다.</span><small>비용 5 · 미보유</small></button>
           <button class="shop-choice" type="button" data-ultimate="hunt" aria-pressed="false"><strong>추적 폭풍</strong><span>큰 토네이도 6개가 적을 찾아 추적하며 강하게 공격합니다.</span><small>비용 5 · 미보유</small></button>
@@ -1140,12 +1144,17 @@
       let enemyHealthScale = 1;
       let enemySpeedScale = 1;
       let enemyDamageScale = 1;
+      let playerDefenseScale = 1;
+      let bossDamageScale = 1;
+      let healRechargeTimer = 0;
       let toastTimer = 0;
       const upgradeOptions = {
         blade: { cost: 3, max: 1 },
         vitality: { cost: 4, max: 1 },
         weaken: { cost: 3, max: 1 },
         fracture: { cost: 4, max: 1 },
+        guard: { cost: 3, max: 1 },
+        bossbane: { cost: 4, max: 1 },
       };
       const upgradeLevels = Object.fromEntries(Object.keys(upgradeOptions).map((upgrade) => [upgrade, 0]));
 
@@ -1156,7 +1165,8 @@
         targetBox: $("#target-box"), targetName: $("#target-name"), targetHealth: $("#target-health"),
         targetFill: $("#target-fill"), shopCurrency: $("#shop-currency"),
         healingSpring: $("#healing-spring-button"),
-        healCharges: $("#heal-charges"), ultimateCooldown: $("#ultimate-cooldown"),
+        healCharges: $("#heal-charges"), healRechargeTimer: $("#heal-recharge-timer"),
+        ultimateCooldown: $("#ultimate-cooldown"),
         debugPanel: $("#debug-panel"), debugPosition: $("#debug-position"),
         debugEnemies: $("#debug-enemies"), debugState: $("#debug-state"), debugScore: $("#debug-score"),
       };
@@ -1174,6 +1184,9 @@
         dom.healthMeter.setAttribute("aria-valuenow", String(Math.ceil(player.health)));
         dom.healthMeter.setAttribute("aria-valuemax", String(player.maxHealth));
         dom.healCharges.textContent = player.healCharges;
+        dom.healRechargeTimer.textContent = player.healCharges < 2
+          ? `다음 충전 ${Math.ceil(healRechargeTimer)}초`
+          : "충전 완료";
         dom.score.textContent = score;
         dom.remaining.textContent = Math.max(0, enemiesToSpawn + enemies.length);
         dom.currency.textContent = currency;
@@ -1924,8 +1937,12 @@
         currency = 0;
         elapsed = 0;
         player.health = player.maxHealth = 100;
+        player.healCharges = 2;
+        healRechargeTimer = 0;
         player.damage = 48;
         player.damageScale = 1;
+        playerDefenseScale = 1;
+        bossDamageScale = 1;
         player.ultimateCooldown = 0;
         player.ultimateMode = "radial";
         player.ultimateModes = { radial: true, orbit: false, hunt: false };
@@ -1965,7 +1982,6 @@
 
       function startStage(firstStage = false) {
         if (!firstStage) stage += 1;
-        player.healCharges = 2;
         player.invulnerable = 0;
         state = stage === 5 ? "boss-intro" : "playing";
         enemiesToSpawn = stage === 5 ? 1 : 10 * (2 ** (stage - 1));
@@ -2237,7 +2253,7 @@
       function castUltimate() {
         if (state !== "playing" || player.timeStopTimer > 0 || player.ultimateCooldown > 0) return;
         playArenaSound("ultimate");
-        player.ultimateCooldown = 60;
+        player.ultimateCooldown = 30;
         const count = player.ultimateMode === "radial" ? 8 : player.ultimateMode === "orbit" ? 4 : 6;
         for (let index = 0; index < count; index += 1) {
           const angle = yaw + (index / count) * Math.PI * 2;
@@ -2350,9 +2366,9 @@
             && Math.hypot(player.position.x - dracoSafeDome.center.x, player.position.z - dracoSafeDome.center.z) <= dracoSafeDome.radius
             && player.position.y - 1.68 <= dracoSafeDome.height) return;
         if (!ignoreInvulnerability && player.invulnerable > 0) return;
-        let damage = amount * enemyDamageScale;
+        let damage = amount * enemyDamageScale * playerDefenseScale;
         if (!Number.isFinite(damage) || damage < 0) {
-          console.error(`잘못된 피해값 amount=${String(amount)}, scale=${String(enemyDamageScale)}\n${new Error().stack}`);
+          console.error(`잘못된 피해값 amount=${String(amount)}, scale=${String(enemyDamageScale)}, defense=${String(playerDefenseScale)}\n${new Error().stack}`);
           damage = 1;
         }
         player.health = Math.max(0, player.health - damage);
@@ -2771,7 +2787,8 @@
       function damageEnemy(enemy, amount) {
         if (!enemies.includes(enemy)) return;
         if (enemy.type === "boss" && enemy.invulnerable) return;
-        enemy.hp = Math.max(0, enemy.hp - amount);
+        const damageMultiplier = enemy.type === "boss" ? bossDamageScale : 1;
+        enemy.hp = Math.max(0, enemy.hp - amount * damageMultiplier);
         playArenaSound("impact");
         if (enemy.type === "boss" && !enemy.enraged && enemy.hp > 0 && enemy.hp <= enemy.maxHp * 0.3) {
           enemy.enraged = true;
@@ -3072,6 +3089,13 @@
       function updateGame(delta) {
         elapsed += delta;
         player.ultimateCooldown = Math.max(0, player.ultimateCooldown - delta);
+        if (player.healCharges < 2) {
+          healRechargeTimer = Math.max(0, healRechargeTimer - delta);
+          if (healRechargeTimer === 0) {
+            player.healCharges += 1;
+            healRechargeTimer = player.healCharges < 2 ? 30 : 0;
+          }
+        }
         spawnTimer -= delta;
         if (enemiesToSpawn > 0 && spawnTimer <= 0) {
           const spawnCount = Math.min(stage, enemiesToSpawn);
@@ -3167,6 +3191,8 @@
           }
           if (upgrade === "weaken") { enemySpeedScale *= 0.85; enemyDamageScale *= 0.85; }
           if (upgrade === "fracture") enemyHealthScale *= 0.8;
+          if (upgrade === "guard") playerDefenseScale *= 0.8;
+          if (upgrade === "bossbane") bossDamageScale *= 1.35;
           updateHud();
         });
       });
@@ -3190,6 +3216,7 @@
         if (event.code === "KeyQ") {
           if (!event.repeat && state === "playing" && player.timeStopTimer <= 0
               && player.healCharges > 0 && player.health < player.maxHealth) {
+            if (player.healCharges === 2) healRechargeTimer = 30;
             player.healCharges -= 1;
             player.health = Math.min(player.maxHealth, player.health + 30);
             healFlash.classList.remove("is-active");
