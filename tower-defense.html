@@ -17,14 +17,25 @@
           <span>RIFT CORE DEFENSE</span>
           <h1>균열 방어전</h1>
         </div>
+        <button class="camera-button" id="camera-toggle" type="button" aria-pressed="false">자유 시점 T</button>
         <button class="sound-button" id="sound-toggle" type="button" aria-pressed="true">사운드 켜짐</button>
       </header>
 
       <section class="battle-stats" aria-label="전투 상태">
-        <div><span>스테이지</span><strong id="wave-value">1 / 5</strong></div>
+        <div><span>스테이지</span><strong id="wave-value">1 / 10</strong></div>
         <div><span>보유 골드</span><strong><b id="gold-value">240</b> G</strong></div>
         <div><span>균열핵 내구도</span><strong><b id="gate-value">20</b> / 20</strong></div>
         <div><span>접근 중인 적</span><strong id="enemy-value">0</strong></div>
+      </section>
+
+      <section class="boss-health-display" id="boss-health-display" aria-label="보스 체력" hidden>
+        <div class="boss-health-display__heading">
+          <strong id="boss-health-name"></strong>
+          <span id="boss-health-value"></span>
+        </div>
+        <div class="boss-health-track" id="boss-health-meter" role="meter" aria-label="보스 체력" aria-valuemin="0" aria-valuemax="1" aria-valuenow="1">
+          <div class="boss-health-fill" id="boss-health-fill"></div>
+        </div>
       </section>
 
       <aside class="build-panel" aria-label="타워 건설 및 스테이지 제어">
@@ -32,23 +43,28 @@
           <span class="eyebrow">RIFT COMMAND</span>
           <h2>방어 지휘</h2>
         </div>
-        <p class="panel-copy">길 밖의 빈 땅을 선택해 타워를 건설하세요.</p>
+        <p class="panel-copy">단계가 오를수록 도로가 열립니다. 붉은 도로·성채·가장자리와 기존 타워 주변은 건설할 수 없습니다.</p>
 
         <div class="tower-options" aria-label="건설할 타워 선택">
           <button class="tower-option" type="button" data-build="bolt" aria-pressed="false">
             <span class="tower-option__icon tower-option__icon--bolt">✦</span>
-            <span><strong>태양 석궁</strong><small>단일 · 빠른 사격</small></span>
+            <span><strong>태양 석궁</strong><small>연사 · 단일 집중</small></span>
             <b>55 G</b>
           </button>
           <button class="tower-option" type="button" data-build="frost" aria-pressed="false">
             <span class="tower-option__icon tower-option__icon--frost">❄</span>
-            <span><strong>빙결 수정</strong><small>범위 · 적 둔화</small></span>
+            <span><strong>빙결 수정</strong><small>파동 · 광역 둔화</small></span>
             <b>80 G</b>
           </button>
           <button class="tower-option" type="button" data-build="storm" aria-pressed="false">
             <span class="tower-option__icon tower-option__icon--storm">ϟ</span>
             <span><strong>폭풍 토템</strong><small>광역 · 강한 충격</small></span>
             <b>110 G</b>
+          </button>
+          <button class="tower-option" type="button" data-build="cannon" aria-pressed="false">
+            <span class="tower-option__icon tower-option__icon--cannon">◆</span>
+            <span><strong>룬 대포</strong><small>중장거리 · 폭발 공격</small></span>
+            <b>145 G</b>
           </button>
         </div>
 
@@ -65,6 +81,7 @@
         </div>
 
         <div class="command-actions">
+          <button class="pause-button" id="speed-button" type="button">배속 1x</button>
           <button class="wave-button" id="wave-button" type="button">스테이지 시작</button>
           <button class="pause-button" id="pause-button" type="button" disabled>일시 정지</button>
         </div>
@@ -76,8 +93,10 @@
 
       <div class="map-hint" id="map-hint">
         <span class="map-hint__dot"></span>
-        노시 · 드래곤 · 균열 수정 타워 · 휠 확대/축소
+        차원 균열 · 성채와 숲 · T 자유 시점 · WASD/좌클릭 이동 · 우클릭 회전 · 휠 확대
       </div>
+
+      <div class="boss-warning" id="boss-warning" role="status" aria-live="assertive" hidden></div>
 
       <section class="end-overlay" id="end-overlay" hidden aria-live="polite">
         <div class="end-card">
